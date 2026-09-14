@@ -33,7 +33,7 @@ export default function Home() {
         ]);
         const productsData = await productsRes.json();
         const settingsData = await settingsRes.json();
-        setProducts(productsData);
+        setProducts(Array.isArray(productsData) ? productsData : []);
         setSettings(settingsData);
       } catch (error) {
         console.error("Failed to fetch data:", error);

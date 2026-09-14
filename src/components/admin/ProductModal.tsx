@@ -207,7 +207,10 @@ const AdminProductModal: React.FC<AdminProductModalProps> = ({ product, onClose,
 
                         <div>
                             <div className="flex items-center justify-between mb-4">
-                                <label className="text-[10px] text-white/70 font-black uppercase tracking-widest block">Variants (Size & Stock)</label>
+                                <div>
+                                    <label className="text-[10px] text-white/70 font-black uppercase tracking-widest block">Variants (Size & Stock)</label>
+                                    <p className="text-[9px] text-white/40 font-medium mt-0.5">Click the toggle to cross out a size when out of stock</p>
+                                </div>
                                 <button 
                                     type="button"
                                     onClick={addVariant}
@@ -216,32 +219,64 @@ const AdminProductModal: React.FC<AdminProductModalProps> = ({ product, onClose,
                                     <Plus size={12} /> Add Size
                                 </button>
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                {formData.variants.map((v: any, i: number) => (
-                                    <div key={i} className="flex gap-2 items-center bg-white/[0.03] border border-white/5 p-2 rounded-[14px]">
-                                        <input 
-                                            type="text" 
-                                            placeholder="Size"
-                                            value={v.size}
-                                            onChange={(e) => updateVariant(i, 'size', e.target.value)}
-                                            className="w-16 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none"
-                                        />
-                                        <input 
-                                            type="number" 
-                                            placeholder="Stock"
-                                            value={v.stock === 0 ? '' : v.stock}
-                                            onChange={(e) => updateVariant(i, 'stock', e.target.value === '' ? 0 : Number(e.target.value))}
-                                            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] font-black uppercase tracking-widest text-white focus:outline-none"
-                                        />
-                                        <button 
-                                            type="button"
-                                            onClick={() => removeVariant(i)}
-                                            className="p-1.5 text-red-500/60 hover:text-red-500 transition-colors"
-                                        >
-                                            <Trash2 size={12} />
-                                        </button>
-                                    </div>
-                                ))}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {formData.variants.map((v: any, i: number) => {
+                                    const isOutOfStock = Number(v.stock) === 0;
+                                    return (
+                                        <div key={i} className={`flex gap-2 items-center p-2.5 rounded-[14px] border transition-all ${
+                                            isOutOfStock 
+                                                ? 'bg-red-500/[0.04] border-red-500/20' 
+                                                : 'bg-white/[0.03] border-white/5'
+                                        }`}>
+                                            {/* Size input with strike-through when out of stock */}
+                                            <input 
+                                                type="text" 
+                                                placeholder="Size"
+                                                value={v.size}
+                                                onChange={(e) => updateVariant(i, 'size', e.target.value)}
+                                                className={`w-16 rounded-lg px-2 py-1.5 text-xs font-black uppercase tracking-widest text-center focus:outline-none transition-all ${
+                                                    isOutOfStock 
+                                                        ? 'bg-red-500/10 border border-red-500/30 text-red-400 line-through' 
+                                                        : 'bg-white/5 border border-white/10 text-white'
+                                                }`}
+                                            />
+                                            {/* Stock input */}
+                                            <input 
+                                                type="number" 
+                                                min="0"
+                                                placeholder="0"
+                                                value={v.stock === 0 ? '' : v.stock}
+                                                onChange={(e) => updateVariant(i, 'stock', e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                                                className={`flex-1 rounded-lg px-2.5 py-1.5 text-xs font-black uppercase tracking-widest focus:outline-none transition-all ${
+                                                    isOutOfStock 
+                                                        ? 'bg-red-500/10 border border-red-500/30 text-red-300 placeholder-red-400/40' 
+                                                        : 'bg-white/5 border border-white/10 text-white'
+                                                }`}
+                                            />
+                                            {/* Toggle Cross Out (Out of Stock / In Stock) */}
+                                            <button
+                                                type="button"
+                                                title={isOutOfStock ? "Restock Size (Set to 10)" : "Cross Out Size (Set to 0)"}
+                                                onClick={() => updateVariant(i, 'stock', isOutOfStock ? 10 : 0)}
+                                                className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all whitespace-nowrap border ${
+                                                    isOutOfStock
+                                                        ? 'bg-red-500/20 text-red-300 border-red-500/40 hover:bg-emerald-500/20 hover:text-emerald-300 hover:border-emerald-500/30'
+                                                        : 'bg-white/5 text-white/50 border-white/10 hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/30'
+                                                }`}
+                                            >
+                                                {isOutOfStock ? '✕ SOLD' : 'IN STOCK'}
+                                            </button>
+                                            {/* Remove variant */}
+                                            <button 
+                                                type="button"
+                                                onClick={() => removeVariant(i)}
+                                                className="p-1.5 text-white/30 hover:text-red-500 transition-colors"
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
 

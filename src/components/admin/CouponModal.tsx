@@ -37,9 +37,15 @@ export default function AdminCouponModal({ coupon, onClose, onSave }: CouponModa
         }
     }, [coupon]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+        const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(formData);
+        const payload: any = {
+            ...formData,
+            expiryDate: formData.expiryDate ? new Date(formData.expiryDate) : undefined,
+            maxDiscount: formData.maxDiscount > 0 ? formData.maxDiscount : undefined,
+            usageLimit: formData.usageLimit > 0 ? formData.usageLimit : undefined,
+        };
+        onSave(payload);
     };
 
     return (

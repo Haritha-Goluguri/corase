@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/mongoose";
 import Product from "@/models/Product";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import mongoose from "mongoose";
 
 export async function PATCH(
   req: Request,
@@ -17,8 +18,6 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    
-    
     await connectToDatabase();
     
     // Map frontend fields to DB fields
@@ -34,7 +33,8 @@ export async function PATCH(
     delete updateData.name;
     delete updateData.image;
     
-    const product = await Product.findOneAndUpdate({ id }, updateData, { new: true });
+    const filter = mongoose.Types.ObjectId.isValid(id) ? { $or: [{ id }, { _id: id }] } : { id };
+    const product = await Product.findOneAndUpdate(filter, updateData, { new: true });
     
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
@@ -61,7 +61,8 @@ export async function DELETE(
     
     await connectToDatabase();
     
-    const product = await Product.findOneAndDelete({ id });
+    const filter = mongoose.Types.ObjectId.isValid(id) ? { $or: [{ id }, { _id: id }] } : { id };
+    const product = await Product.findOneAndDelete(filter);
     
     if (!product) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });

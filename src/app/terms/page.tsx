@@ -22,8 +22,16 @@ const TERMS = [
         content: "We reserve the right to refuse or cancel any order for reasons including product availability, errors in pricing, or suspected fraud."
     },
     {
-        title: "Returns & Exchanges",
-        content: "Our items are often limited-edition drops. Please refer to our Shipping & Returns section for specific policies regarding exchanges."
+        title: "Shipping & Delivery Policy",
+        content: "We deliver across India via trusted express courier partners. Orders are processed within 24 to 48 hours of confirmation. Standard delivery takes 3 to 5 business days depending on delivery pincode. Free shipping applies on orders of ₹999 and above; a flat shipping fee of ₹69 applies on orders below ₹999. Real-time tracking links are emailed to customers upon shipment dispatch."
+    },
+    {
+        title: "Cancellation & Refund Policy",
+        content: "Orders can be cancelled before they are dispatched for shipment by emailing us at hellocorase@gmail.com. In case you receive a damaged, defective, or incorrect piece, you can request a return or replacement within 7 days of delivery. Upon inspection and approval, refunds are credited back to your original payment source within 5 to 7 business days."
+    },
+    {
+        title: "Customer Support & Grievance Contact",
+        content: "For any inquiries, questions, or payment grievance resolutions, reach our team at hellocorase@gmail.com or call +91 99597 35776 (Mon–Sat, 10:00 AM – 7:00 PM IST). Studio Address: 123, Brigade Road, Bangalore, Karnataka, India 560001."
     }
 ];
 

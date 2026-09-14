@@ -5,25 +5,59 @@ import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
 import Script from 'next/script';
-import { CheckCircle2, Truck, Shield, ArrowLeft, Tag, Ticket, ArrowRight } from 'lucide-react';
+import { CheckCircle2, Truck, Shield, ArrowLeft, Tag, Ticket, ArrowRight, ChevronDown, ShoppingBag } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
-type PaymentMethod = 'upi' | 'card' | 'cod' | 'upi_direct';
+type PaymentMethod = 'gateway';
 
-const FIELDS = [
-    { key: 'name',    label: 'Full Name',   placeholder: 'Arjun Mehta',       type: 'text',  col: 2 },
-    { key: 'email',   label: 'Email',        placeholder: 'you@example.com',   type: 'email', col: 1 },
-    { key: 'phone',   label: 'Phone',        placeholder: '+91 98765 43210',   type: 'tel',   col: 1 },
-    { key: 'address', label: 'Address',      placeholder: '123, MG Road',      type: 'text',  col: 2 },
-    { key: 'city',    label: 'City',         placeholder: 'Bangalore',         type: 'text',  col: 1 },
-    { key: 'state',   label: 'State',        placeholder: 'Karnataka',         type: 'text',  col: 1 },
-    { key: 'pincode', label: 'PIN Code',     placeholder: '560001',            type: 'text',  col: 1 },
+export const INDIAN_STATES = [
+    "Andhra Pradesh",
+    "Arunachal Pradesh",
+    "Assam",
+    "Bihar",
+    "Chhattisgarh",
+    "Goa",
+    "Gujarat",
+    "Haryana",
+    "Himachal Pradesh",
+    "Jharkhand",
+    "Karnataka",
+    "Kerala",
+    "Madhya Pradesh",
+    "Maharashtra",
+    "Manipur",
+    "Meghalaya",
+    "Mizoram",
+    "Nagaland",
+    "Odisha",
+    "Punjab",
+    "Rajasthan",
+    "Sikkim",
+    "Tamil Nadu",
+    "Telangana",
+    "Tripura",
+    "Uttar Pradesh",
+    "Uttarakhand",
+    "West Bengal",
+    "Andaman and Nicobar Islands",
+    "Chandigarh",
+    "Dadra and Nagar Haveli and Daman and Diu",
+    "Delhi",
+    "Jammu and Kashmir",
+    "Ladakh",
+    "Lakshadweep",
+    "Puducherry"
 ] as const;
 
 const PAYMENT_OPTIONS = [
-    { id: 'upi_direct', label: 'Direct UPI (Instant QR)', sub: 'Pay directly via GPay, PhonePe, Paytm' },
+    { 
+        id: 'gateway', 
+        label: 'Online Payment Gateway (Razorpay)', 
+        sub: 'UPI (GPay, PhonePe, Paytm, QR), Cards, NetBanking & Wallets',
+        badge: 'Instant & Secure' 
+    },
 ] as const;
 
 export default function CheckoutPage() {
@@ -31,9 +65,9 @@ export default function CheckoutPage() {
         cart, totalPrice, clearCart, 
         appliedCoupon, applyCoupon, removeCoupon, discountedTotal,
         checkoutItems, checkoutTotal, checkoutDiscountedTotal,
-        buyNowItem, clearBuyNowItem
+        buyNowItem, clearBuyNowItem, isInitialized
     } = useCart();
-    const { data: session } = useSession();
+    const { data: session, status } = useSession();
     const router = useRouter();
 
     const [step, setStep] = useState<'details' | 'success'>('details');
@@ -48,26 +82,50 @@ export default function CheckoutPage() {
         state: '', 
         pincode: '',
     });
-    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('upi_direct');
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('gateway');
     const [successOrderId, setSuccessOrderId] = useState<string | null>(null);
-    const [showUpiModal, setShowUpiModal] = useState(false);
-    const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
-    const [utr, setUtr] = useState('');
-    const [customerUpi, setCustomerUpi] = useState('');
-    const [isConfirming, setIsConfirming] = useState(false);
+
+    const updateFormField = (key: string, value: string) => {
+        setForm(prev => ({ ...prev, [key]: value }));
+        if (errors[key]) {
+            setErrors(prev => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+            });
+        }
+    };
+
+    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        // Keep only digits and optional leading +
+        let val = e.target.value.replace(/[^\d+]/g, '');
+        if (val.startsWith('+')) {
+            val = '+' + val.slice(1).replace(/\+/g, '').slice(0, 12);
+        } else {
+            val = val.slice(0, 12);
+        }
+        updateFormField('phone', val);
+    };
+
+    const handlePincodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+        updateFormField('pincode', val);
+    };
 
     const shipping = (checkoutTotal >= 999 || (buyNowItem && buyNowItem.price * buyNowItem.quantity >= 999)) ? 0 : 69;
     const finalTotal = Math.max((checkoutDiscountedTotal || 0) + (checkoutItems.length > 0 ? shipping : 0), 0);
 
-    // Redirect if no items (with a small buffer for initialization)
+    // Pre-fill user profile info if logged in
     useEffect(() => {
-        if (checkoutItems.length === 0 && step !== 'success') {
-            const timer = setTimeout(() => {
-                if (checkoutItems.length === 0) router.push('/shop');
-            }, 500);
-            return () => clearTimeout(timer);
+        if (session?.user) {
+            setForm(prev => ({
+                ...prev,
+                name: prev.name || session.user?.name || '',
+                email: prev.email || session.user?.email || '',
+            }));
         }
-    }, [checkoutItems, router, step]);
+    }, [session]);
 
     const handlePayment = async () => {
         if (!session) {
@@ -76,9 +134,49 @@ export default function CheckoutPage() {
             return;
         }
 
-        // Basic validation
-        if (!form.name || !form.email || !form.phone || !form.address || !form.city || !form.state || !form.pincode) {
-            alert("Please fill all delivery details including your phone number.");
+        // Strict field validation
+        const newErrors: Record<string, string> = {};
+
+        if (!form.name.trim()) {
+            newErrors.name = "Full name is required";
+        }
+        if (!form.email.trim()) {
+            newErrors.email = "Email address is required";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+            newErrors.email = "Please enter a valid email address";
+        }
+
+        const phoneDigits = form.phone.replace(/\D/g, '');
+        if (!form.phone.trim()) {
+            newErrors.phone = "Phone number is required (12 digits)";
+        } else if (phoneDigits.length !== 12) {
+            newErrors.phone = `Phone number must be exactly 12 digits (currently ${phoneDigits.length}/12 digits)`;
+        }
+
+        if (!form.address.trim()) {
+            newErrors.address = "Delivery address is required";
+        }
+
+        if (!form.city.trim()) {
+            newErrors.city = "City is required";
+        }
+
+        if (!form.state.trim()) {
+            newErrors.state = "Please select your State";
+        }
+
+        const pincodeDigits = form.pincode.replace(/\D/g, '');
+        if (!form.pincode.trim()) {
+            newErrors.pincode = "PIN code is required (6 digits)";
+        } else if (pincodeDigits.length !== 6) {
+            newErrors.pincode = `PIN code must be exactly 6 digits (currently ${pincodeDigits.length}/6 digits)`;
+        }
+
+        setErrors(newErrors);
+
+        if (Object.keys(newErrors).length > 0) {
+            const firstKey = Object.keys(newErrors)[0];
+            alert(newErrors[firstKey]);
             return;
         }
 
@@ -92,13 +190,13 @@ export default function CheckoutPage() {
                 body: JSON.stringify({
                     items: checkoutItems,
                     shippingAddress: {
-                        fullName: form.name,
-                        email: form.email,
-                        phone: form.phone,
-                        address: form.address,
-                        city: form.city,
-                        state: form.state,
-                        zipCode: form.pincode,
+                        fullName: form.name.trim(),
+                        email: form.email.trim(),
+                        phone: form.phone.trim(),
+                        address: form.address.trim(),
+                        city: form.city.trim(),
+                        state: form.state.trim(),
+                        zipCode: form.pincode.trim(),
                         country: "India"
                     },
                     subtotal: checkoutTotal,
@@ -118,42 +216,76 @@ export default function CheckoutPage() {
                 return;
             }
 
-            if (paymentMethod === 'upi_direct') {
-                setPendingOrderId(orderData.orderId);
-                setShowUpiModal(true);
+            // If order was 100% covered by coupon/promotion, skip gateway
+            if (orderData.isFree) {
+                setSuccessOrderId(orderData.orderId);
+                if (buyNowItem) {
+                    clearBuyNowItem();
+                } else {
+                    clearCart();
+                }
+                setStep('success');
+                setIsLoading(false);
                 return;
             }
 
-            // 2. Open Razorpay Widget (Standard Flow)
+            // 2. Open Razorpay Payment Gateway Widget
+            if (typeof (window as any).Razorpay === 'undefined') {
+                alert("Payment gateway is initializing. Please wait a moment and try again.");
+                setIsLoading(false);
+                return;
+            }
+
+            const razorpayKey = orderData.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+            if (!razorpayKey) {
+                alert("Payment gateway configuration error. Please contact store support.");
+                setIsLoading(false);
+                return;
+            }
+
             const options = {
-                key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, 
+                key: razorpayKey, 
                 amount: orderData.amount,
-                currency: orderData.currency,
+                currency: orderData.currency || "INR",
                 name: "CORASE",
                 description: "DRIP, DETAIL, DOMINANCE",
                 order_id: orderData.razorpayOrderId,
+                modal: {
+                    ondismiss: function () {
+                        setIsLoading(false);
+                    },
+                },
                 handler: async function (response: any) {
-                    const verifyRes = await fetch("/api/orders/verify", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            razorpay_order_id: response.razorpay_order_id,
-                            razorpay_payment_id: response.razorpay_payment_id,
-                            razorpay_signature: response.razorpay_signature,
-                            orderId: orderData.orderId,
-                        }),
-                    });
+                    try {
+                        const verifyRes = await fetch("/api/orders/verify", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                orderId: orderData.orderId,
+                                isBuyNow: Boolean(buyNowItem),
+                            }),
+                        });
 
-                    if (verifyRes.ok) {
-                        setSuccessOrderId(orderData.orderId);
-                        if (buyNowItem) {
-                            clearBuyNowItem();
+                        if (verifyRes.ok) {
+                            setSuccessOrderId(orderData.orderId);
+                            if (buyNowItem) {
+                                clearBuyNowItem();
+                            } else {
+                                clearCart();
+                            }
+                            setStep('success');
                         } else {
-                            clearCart();
+                            const errData = await verifyRes.json().catch(() => ({}));
+                            alert(errData.message || "Payment verification failed. Please contact support.");
                         }
-                        setStep('success');
-                    } else {
-                        alert("Payment verification failed. Please contact support.");
+                    } catch (verifyErr) {
+                        console.error("Verification network error:", verifyErr);
+                        alert("Network error during payment verification. Please contact support.");
+                    } finally {
+                        setIsLoading(false);
                     }
                 },
                 prefill: {
@@ -168,53 +300,15 @@ export default function CheckoutPage() {
 
             const rzp = new (window as any).Razorpay(options);
             rzp.on('payment.failed', function (response: any) {
-                alert(`Payment Failed: ${response.error.description}`);
+                alert(`Payment Failed: ${response.error?.description || "Transaction cancelled or failed"}`);
+                setIsLoading(false);
             });
             rzp.open();
 
         } catch (error) {
             console.error("Checkout error:", error);
             alert("Something went wrong during checkout.");
-        } finally {
             setIsLoading(false);
-        }
-    };
-
-    const confirmUpiPayment = async () => {
-        if (!utr) {
-            alert("Please enter the Transaction ID / UTR number.");
-            return;
-        }
-
-        setIsConfirming(true);
-        try {
-            const res = await fetch("/api/orders/update-transaction", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    orderId: pendingOrderId,
-                    transactionId: utr,
-                    customerUpiId: customerUpi
-                }),
-            });
-
-            if (res.ok) {
-                setSuccessOrderId(pendingOrderId);
-                if (buyNowItem) {
-                    clearBuyNowItem();
-                } else {
-                    clearCart();
-                }
-                setStep('success');
-                setShowUpiModal(false);
-            } else {
-                alert("Failed to update transaction. Please contact support.");
-            }
-        } catch (err) {
-            console.error(err);
-            alert("Something went wrong.");
-        } finally {
-            setIsConfirming(false);
         }
     };
 
@@ -268,6 +362,42 @@ export default function CheckoutPage() {
         );
     }
 
+    // Loading state while cart and session initialize
+    if (!isInitialized || status === 'loading') {
+        return (
+            <div className="bg-background min-h-screen pt-32 pb-24 text-foreground flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-8 h-8 border-2 border-brand-red border-t-transparent rounded-full animate-spin" />
+                    <p className="text-xs font-bold tracking-[0.2em] text-foreground/40 uppercase font-syncopate">Loading Checkout...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Empty bag view: instead of an abrupt and confusing silent redirect to /shop, show a clear, friendly empty bag screen
+    if (checkoutItems.length === 0) {
+        return (
+            <div className="bg-background min-h-screen pt-32 pb-24 text-foreground flex items-center justify-center px-4">
+                <div className="max-w-md mx-auto text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-foreground/5 flex items-center justify-center mx-auto mb-6">
+                        <ShoppingBag size={28} className="text-foreground/40" />
+                    </div>
+                    <h1 className="text-xl font-black font-syncopate uppercase tracking-wider mb-2">Your Bag is Empty</h1>
+                    <p className="text-xs text-foreground/50 mb-8 leading-relaxed">
+                        Looks like you haven&apos;t added any items to your bag yet. Browse our collections and find your style.
+                    </p>
+                    <Link
+                        href="/shop"
+                        className="inline-flex items-center gap-3 bg-foreground text-background font-black text-xs tracking-[0.2em] uppercase px-8 py-4 rounded-xl hover:bg-foreground/80 transition-all cursor-pointer"
+                    >
+                        <span>Explore Shop</span>
+                        <ArrowRight size={14} />
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-background text-foreground pt-28 pb-20 px-5 lg:px-10">
             <Script src="https://checkout.razorpay.com/v1/checkout.js" />
@@ -295,20 +425,166 @@ export default function CheckoutPage() {
                                 Delivery Details
                             </h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                {FIELDS.map(field => (
-                                    <div key={field.key} className={field.col === 2 ? 'sm:col-span-2' : ''}>
-                                        <label className="block text-[11px] font-black text-foreground/60 uppercase tracking-[0.2em] mb-2.5">
-                                            {field.label}
+                                {/* 1. Full Name */}
+                                <div className="sm:col-span-2">
+                                    <div className="flex items-center justify-between mb-2.5">
+                                        <label className="block text-[11px] font-black text-foreground/70 uppercase tracking-[0.2em]">
+                                            Full Name <span className="text-brand-red">*</span>
                                         </label>
-                                        <input
-                                            type={field.type}
-                                            value={form[field.key]}
-                                            onChange={e => setForm({ ...form, [field.key]: e.target.value })}
-                                            placeholder={field.placeholder}
-                                            className="w-full bg-foreground/[0.02] border border-foreground/[0.1] text-foreground placeholder-foreground/20 rounded-2xl px-5 py-4 text-sm font-bold focus:outline-none focus:border-foreground/40 focus:bg-foreground/[0.04] transition-all"
-                                        />
                                     </div>
-                                ))}
+                                    <input
+                                        type="text"
+                                        value={form.name}
+                                        onChange={e => updateFormField('name', e.target.value)}
+                                        placeholder="Arjun Mehta"
+                                        className={`w-full bg-foreground/[0.02] border ${errors.name ? 'border-red-500/60 bg-red-500/[0.03]' : 'border-foreground/[0.1]'} text-foreground placeholder-foreground/20 rounded-2xl px-5 py-4 text-sm font-bold focus:outline-none focus:border-foreground/40 focus:bg-foreground/[0.04] transition-all`}
+                                    />
+                                    {errors.name && (
+                                        <p className="text-[10px] font-bold text-red-400 tracking-wider mt-1.5">{errors.name}</p>
+                                    )}
+                                </div>
+
+                                {/* 2. Email Address */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-2.5">
+                                        <label className="block text-[11px] font-black text-foreground/70 uppercase tracking-[0.2em]">
+                                            Email Address <span className="text-brand-red">*</span>
+                                        </label>
+                                    </div>
+                                    <input
+                                        type="email"
+                                        value={form.email}
+                                        onChange={e => updateFormField('email', e.target.value)}
+                                        placeholder="you@example.com"
+                                        className={`w-full bg-foreground/[0.02] border ${errors.email ? 'border-red-500/60 bg-red-500/[0.03]' : 'border-foreground/[0.1]'} text-foreground placeholder-foreground/20 rounded-2xl px-5 py-4 text-sm font-bold focus:outline-none focus:border-foreground/40 focus:bg-foreground/[0.04] transition-all`}
+                                    />
+                                    {errors.email && (
+                                        <p className="text-[10px] font-bold text-red-400 tracking-wider mt-1.5">{errors.email}</p>
+                                    )}
+                                </div>
+
+                                {/* 3. Phone Number (12 Digits) */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-2.5">
+                                        <label className="block text-[11px] font-black text-foreground/70 uppercase tracking-[0.2em]">
+                                            Phone Number <span className="text-brand-red">*</span>
+                                        </label>
+                                        <span className={`text-[10px] font-mono font-bold tracking-wider px-2 py-0.5 rounded-full ${
+                                            form.phone.replace(/\D/g, '').length === 12
+                                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                : 'bg-foreground/5 text-foreground/40'
+                                        }`}>
+                                            {form.phone.replace(/\D/g, '').length}/12 Digits
+                                        </span>
+                                    </div>
+                                    <input
+                                        type="tel"
+                                        maxLength={13}
+                                        value={form.phone}
+                                        onChange={handlePhoneChange}
+                                        placeholder="919876543210"
+                                        className={`w-full bg-foreground/[0.02] border ${errors.phone ? 'border-red-500/60 bg-red-500/[0.03]' : 'border-foreground/[0.1]'} text-foreground placeholder-foreground/20 rounded-2xl px-5 py-4 text-sm font-bold focus:outline-none focus:border-foreground/40 focus:bg-foreground/[0.04] transition-all`}
+                                    />
+                                    {errors.phone ? (
+                                        <p className="text-[10px] font-bold text-red-400 tracking-wider mt-1.5">{errors.phone}</p>
+                                    ) : (
+                                        <p className="text-[10px] text-foreground/40 font-medium mt-1.5">Include 91 country code (12 digits total)</p>
+                                    )}
+                                </div>
+
+                                {/* 4. Delivery Address */}
+                                <div className="sm:col-span-2">
+                                    <div className="flex items-center justify-between mb-2.5">
+                                        <label className="block text-[11px] font-black text-foreground/70 uppercase tracking-[0.2em]">
+                                            Delivery Address <span className="text-brand-red">*</span>
+                                        </label>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={form.address}
+                                        onChange={e => updateFormField('address', e.target.value)}
+                                        placeholder="Flat/House No., Building, Street Name, Landmark"
+                                        className={`w-full bg-foreground/[0.02] border ${errors.address ? 'border-red-500/60 bg-red-500/[0.03]' : 'border-foreground/[0.1]'} text-foreground placeholder-foreground/20 rounded-2xl px-5 py-4 text-sm font-bold focus:outline-none focus:border-foreground/40 focus:bg-foreground/[0.04] transition-all`}
+                                    />
+                                    {errors.address && (
+                                        <p className="text-[10px] font-bold text-red-400 tracking-wider mt-1.5">{errors.address}</p>
+                                    )}
+                                </div>
+
+                                {/* 5. City */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-2.5">
+                                        <label className="block text-[11px] font-black text-foreground/70 uppercase tracking-[0.2em]">
+                                            City <span className="text-brand-red">*</span>
+                                        </label>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={form.city}
+                                        onChange={e => updateFormField('city', e.target.value)}
+                                        placeholder="Bangalore"
+                                        className={`w-full bg-foreground/[0.02] border ${errors.city ? 'border-red-500/60 bg-red-500/[0.03]' : 'border-foreground/[0.1]'} text-foreground placeholder-foreground/20 rounded-2xl px-5 py-4 text-sm font-bold focus:outline-none focus:border-foreground/40 focus:bg-foreground/[0.04] transition-all`}
+                                    />
+                                    {errors.city && (
+                                        <p className="text-[10px] font-bold text-red-400 tracking-wider mt-1.5">{errors.city}</p>
+                                    )}
+                                </div>
+
+                                {/* 6. State (Dropdown of all States & UTs in India) */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-2.5">
+                                        <label className="block text-[11px] font-black text-foreground/70 uppercase tracking-[0.2em]">
+                                            State / UT <span className="text-brand-red">*</span>
+                                        </label>
+                                    </div>
+                                    <div className="relative">
+                                        <select
+                                            value={form.state}
+                                            onChange={e => updateFormField('state', e.target.value)}
+                                            className={`w-full appearance-none bg-background text-foreground border ${errors.state ? 'border-red-500/60 bg-red-500/[0.03]' : 'border-foreground/[0.1]'} rounded-2xl px-5 py-4 text-sm font-bold focus:outline-none focus:border-foreground/40 transition-all cursor-pointer`}
+                                        >
+                                            <option value="" disabled className="bg-background text-foreground/40">Select State *</option>
+                                            {INDIAN_STATES.map(s => (
+                                                <option key={s} value={s} className="bg-background text-foreground py-2 font-medium">
+                                                    {s}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <ChevronDown size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-foreground/40 pointer-events-none" />
+                                    </div>
+                                    {errors.state && (
+                                        <p className="text-[10px] font-bold text-red-400 tracking-wider mt-1.5">{errors.state}</p>
+                                    )}
+                                </div>
+
+                                {/* 7. PIN Code (6 Digits) */}
+                                <div className="sm:col-span-2">
+                                    <div className="flex items-center justify-between mb-2.5">
+                                        <label className="block text-[11px] font-black text-foreground/70 uppercase tracking-[0.2em]">
+                                            PIN Code <span className="text-brand-red">*</span>
+                                        </label>
+                                        <span className={`text-[10px] font-mono font-bold tracking-wider px-2 py-0.5 rounded-full ${
+                                            form.pincode.replace(/\D/g, '').length === 6
+                                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                : 'bg-foreground/5 text-foreground/40'
+                                        }`}>
+                                            {form.pincode.replace(/\D/g, '').length}/6 Digits
+                                        </span>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        maxLength={6}
+                                        value={form.pincode}
+                                        onChange={handlePincodeChange}
+                                        placeholder="560001"
+                                        className={`w-full bg-foreground/[0.02] border ${errors.pincode ? 'border-red-500/60 bg-red-500/[0.03]' : 'border-foreground/[0.1]'} text-foreground placeholder-foreground/20 rounded-2xl px-5 py-4 text-sm font-bold focus:outline-none focus:border-foreground/40 focus:bg-foreground/[0.04] transition-all`}
+                                    />
+                                    {errors.pincode ? (
+                                        <p className="text-[10px] font-bold text-red-400 tracking-wider mt-1.5">{errors.pincode}</p>
+                                    ) : (
+                                        <p className="text-[10px] text-foreground/40 font-medium mt-1.5">Enter 6-digit postal code</p>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -318,27 +594,38 @@ export default function CheckoutPage() {
                                 <span className="w-8 h-8 bg-foreground text-background rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 shadow-[0_0_20px_rgba(0,0,0,0.1)]">2</span>
                                 Payment Method
                             </h2>
-                            <div className="space-y-2.5">
+                            <div className="space-y-4">
                                 {PAYMENT_OPTIONS.map(option => (
-                                    <button
+                                    <div
                                         key={option.id}
-                                        onClick={() => setPaymentMethod(option.id as PaymentMethod)}
-                                        className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${
-                                            paymentMethod === option.id
-                                                ? 'border-foreground bg-foreground/[0.05]'
-                                                : 'border-foreground/[0.08] bg-transparent hover:border-foreground/[0.15] hover:bg-foreground/[0.02]'
-                                        }`}
+                                        className="w-full p-5 rounded-2xl border border-foreground/20 bg-foreground/[0.04] transition-all text-left space-y-3"
                                     >
-                                        <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 transition-all ${
-                                            paymentMethod === option.id
-                                                ? 'border-foreground bg-foreground'
-                                                : 'border-foreground/20 bg-transparent'
-                                        }`} />
-                                        <div>
-                                            <p className="font-semibold text-sm text-foreground">{option.label}</p>
-                                            <p className="text-xs text-foreground/60 font-medium mt-0.5">{option.sub}</p>
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex items-center gap-3.5">
+                                                <div className="w-5 h-5 rounded-full border-2 border-foreground bg-foreground flex items-center justify-center flex-shrink-0">
+                                                    <div className="w-2 h-2 rounded-full bg-background" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-black font-syncopate text-xs uppercase tracking-wider text-foreground">{option.label}</p>
+                                                    <p className="text-xs text-foreground/60 font-medium mt-0.5">{option.sub}</p>
+                                                </div>
+                                            </div>
+                                            <span className="text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 whitespace-nowrap">
+                                                Instant
+                                            </span>
                                         </div>
-                                    </button>
+
+                                        {/* Badges */}
+                                        <div className="flex flex-wrap items-center gap-1.5 pt-3 border-t border-foreground/[0.08]">
+                                            <span className="text-[9px] font-black uppercase tracking-wider text-foreground/40 mr-1">Accepted:</span>
+                                            <span className="px-2 py-0.5 rounded-md bg-foreground/5 border border-foreground/10 text-[9px] font-bold text-foreground/80">UPI / QR</span>
+                                            <span className="px-2 py-0.5 rounded-md bg-foreground/5 border border-foreground/10 text-[9px] font-bold text-foreground/80">Google Pay</span>
+                                            <span className="px-2 py-0.5 rounded-md bg-foreground/5 border border-foreground/10 text-[9px] font-bold text-foreground/80">PhonePe</span>
+                                            <span className="px-2 py-0.5 rounded-md bg-foreground/5 border border-foreground/10 text-[9px] font-bold text-foreground/80">Paytm</span>
+                                            <span className="px-2 py-0.5 rounded-md bg-foreground/5 border border-foreground/10 text-[9px] font-bold text-foreground/80">Cards (Debit / Credit)</span>
+                                            <span className="px-2 py-0.5 rounded-md bg-foreground/5 border border-foreground/10 text-[9px] font-bold text-foreground/80">NetBanking</span>
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
                         </div>
@@ -458,117 +745,6 @@ export default function CheckoutPage() {
                     </div>
                 </div>
             </div>
-
-            {/* UPI Direct Modal */}
-            {showUpiModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-                    <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="absolute inset-0 bg-black/80 backdrop-blur-md"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setShowUpiModal(false);
-                        }}
-                    />
-                    <motion.div 
-                        initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                        animate={{ scale: 1, opacity: 1, y: 0 }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="relative bg-[#1a1a1a] border border-white/10 w-full max-w-md rounded-[2.5rem] overflow-y-auto max-h-[90vh] shadow-2xl scrollbar-hide"
-                    >
-                        <div className="p-6 md:p-8 text-center">
-                            <div className="w-14 h-14 bg-white text-black rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-[0_0_30px_rgba(255,255,255,0.15)]">
-                                <Image 
-                                    src="https://upload.wikimedia.org/wikipedia/commons/e/e1/UPI-Logo-vector.svg" 
-                                    alt="UPI" 
-                                    width={28} 
-                                    height={28} 
-                                />
-                            </div>
-                            <h3 className="text-lg font-black font-syncopate uppercase tracking-tight mb-1 text-white">Scan & Pay</h3>
-                            <p className="text-white/50 text-[10px] font-medium mb-6 uppercase tracking-widest">Scan this QR code with any UPI app to pay ₹{finalTotal}</p>
-                            
-                            <div className="bg-white p-5 rounded-[2rem] inline-block mb-6 shadow-[0_0_50px_rgba(255,255,255,0.1)] text-center w-full max-w-[280px]">
-                                <div className="flex flex-col items-center gap-3 mb-4">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 bg-[#5f259f] rounded-lg flex items-center justify-center">
-                                            <span className="text-white font-black text-base">पे</span>
-                                        </div>
-                                        <span className="text-[#5f259f] font-black text-lg tracking-tight">PhonePe</span>
-                                    </div>
-                                    <div className="text-[#5f259f] font-black text-[8px] tracking-[0.2em] uppercase">
-                                        Accepted Here
-                                    </div>
-                                </div>
-
-                                <div className="relative group overflow-hidden rounded-[1.5rem] border border-black/5">
-                                    <Image 
-                                        src="/paymentScanner.jpeg"
-                                        alt="UPI QR Code"
-                                        width={240}
-                                        height={300}
-                                        className="mx-auto object-contain"
-                                        priority
-                                    />
-                                </div>
-
-                                <div className="mt-4 text-black/80 font-black text-[10px] tracking-widest uppercase">
-                                    KORASIKA ABHISHEK
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="bg-foreground/[0.03] rounded-2xl p-4 border border-foreground/[0.08] space-y-4 text-left">
-                                    <div>
-                                        <p className="text-[9px] text-white/40 font-black uppercase tracking-widest mb-1">Store UPI ID</p>
-                                        <p className="text-xs font-mono text-white select-all bg-white/5 p-2 rounded-lg border border-white/10">{process.env.NEXT_PUBLIC_UPI_ID}</p>
-                                    </div>
-                                    <div className="pt-4 border-t border-foreground/10 space-y-4">
-                                        <div>
-                                            <p className="text-[9px] text-white/40 font-black uppercase tracking-widest mb-2 text-left">Your UPI ID</p>
-                                            <input 
-                                                type="text"
-                                                value={customerUpi}
-                                                onChange={(e) => setCustomerUpi(e.target.value)}
-                                                placeholder="e.g. name@upi"
-                                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm font-mono text-white placeholder-white/20 focus:outline-none focus:border-white/40 focus:bg-white/10 transition-all"
-                                            />
-                                        </div>
-                                        <div>
-                                            <div className="flex justify-between items-center mb-2">
-                                                <p className="text-[9px] text-white/40 font-black uppercase tracking-widest text-left">Transaction ID / UTR</p>
-                                                <span className="text-[8px] font-black text-brand-red uppercase tracking-tighter animate-pulse">Required for delivery</span>
-                                            </div>
-                                            <input 
-                                                type="text"
-                                                value={utr}
-                                                onChange={(e) => setUtr(e.target.value)}
-                                                placeholder="12-digit UTR or Transaction ID"
-                                                className="w-full bg-white/5 border border-brand-red/30 rounded-xl px-4 py-3 text-sm font-mono text-white placeholder-white/20 focus:outline-none focus:border-brand-red/50 focus:bg-white/10 transition-all"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <button
-                                    onClick={confirmUpiPayment}
-                                    disabled={isConfirming || !utr}
-                                    className="w-full bg-brand-red text-white py-4 rounded-2xl font-black font-syncopate text-xs tracking-widest uppercase hover:bg-red-600 transition-all shadow-[0_10px_30px_rgba(255,50,50,0.3)] disabled:opacity-50"
-                                >
-                                    {isConfirming ? "Confirming..." : "Confirm Payment"}
-                                </button>
-                                <button
-                                    onClick={() => setShowUpiModal(false)}
-                                    className="w-full text-foreground/40 text-[10px] font-black uppercase tracking-widest hover:text-foreground transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </motion.div>
-                </div>
-            )}
         </div>
     );
 }

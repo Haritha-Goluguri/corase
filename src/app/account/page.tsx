@@ -27,8 +27,8 @@ function AccountPageInner() {
     const [orders, setOrders] = useState<any[]>([]);
     const [loadingOrders, setLoadingOrders] = useState(true);
     const [viewingOrder, setViewingOrder] = useState<any>(null);
-    const [addresses, setAddresses] = useState<any[]>([]);
-    const [isAddingAddress, setIsAddingAddress] = useState(false);
+const [addresses, setAddresses] = useState<any[]>([]);
+const [isAddressesLoaded, setIsAddressesLoaded] = useState(false);    const [isAddingAddress, setIsAddingAddress] = useState(false);
     const [allProducts, setAllProducts] = useState<any[]>([]);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
     const [newAddress, setNewAddress] = useState({
@@ -53,25 +53,24 @@ function AccountPageInner() {
                 .finally(() => setLoadingOrders(false));
 
             // Load saved addresses
-            const savedAddresses = localStorage.getItem(`corase_addresses_${session.user?.email}`);
-            if (savedAddresses) {
-                try {
-                    setAddresses(JSON.parse(savedAddresses));
-                } catch (e) {
-                    console.error("Failed to parse addresses");
-                }
-            }
+                      const savedAddresses = localStorage.getItem(`corase_addresses_${session.user?.email}`);
+          if (savedAddresses) {
+              try {
+                  setAddresses(JSON.parse(savedAddresses));
+              } catch (e) {
+                  console.error("Failed to parse addresses");
+              }
+          }
+          setIsAddressesLoaded(true);
         }
     }, [session]);
 
-    // Save addresses when they change
-    useEffect(() => {
-        if (session && addresses.length > 0) {
-            localStorage.setItem(`corase_addresses_${session.user?.email}`, JSON.stringify(addresses));
-        } else if (session && addresses.length === 0) {
-            localStorage.removeItem(`corase_addresses_${session.user?.email}`);
-        }
-    }, [addresses, session]);
+      // Save addresses only after initial load from storage completes
+  useEffect(() => {
+      if (session && isAddressesLoaded) {
+          localStorage.setItem(`corase_addresses_${session.user?.email}`, JSON.stringify(addresses));
+      }
+  }, [addresses, session, isAddressesLoaded]);
 
     const handleSignOut = async () => {
         await signOut({ redirect: false });
@@ -82,12 +81,12 @@ function AccountPageInner() {
     useEffect(() => {
         fetch('/api/products')
             .then(res => res.json())
-            .then(data => setAllProducts(data))
+            .then(data => setAllProducts(Array.isArray(data) ? data : []))
             .catch(err => console.error(err));
     }, []);
 
     const handleProductClick = (productId: string) => {
-        const product = allProducts.find(p => p.id === productId);
+        const product = allProducts.find(p => p.id === productId || p._id === productId);
         if (product) {
             setSelectedProduct(product);
         }

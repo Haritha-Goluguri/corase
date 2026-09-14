@@ -29,10 +29,11 @@ const LINKS = {
         { label: 'Graphic Tees',   href: '/shop?filter=graphic' },
     ],
     Company: [
-        { label: 'Our Story',      href: '/about' },
-        { label: 'Contact Us',     href: '/contact' },
-        { label: 'Privacy Policy', href: '/privacy' },
-        { label: 'Terms of Use',   href: '/terms' },
+        { label: 'Our Story',          href: '/about' },
+        { label: 'Contact Us',         href: '/contact' },
+        { label: 'Privacy Policy',     href: '/privacy' },
+        { label: 'Terms & Conditions', href: '/terms' },
+        { label: 'Shipping & Returns', href: '/terms' },
     ]
 };
 

@@ -41,12 +41,18 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
             const data = await res.json();
             const dbWishlist = data.wishlist || [];
 
-            // Merge guest wishlist if DB is empty
-            if (localItems.length > 0 && dbWishlist.length === 0) {
-                setWishlist(localItems);
-                localStorage.removeItem("corase_wishlist");
+            // Merge guest wishlist into DB wishlist without dropping items
+            if (localItems.length > 0) {
+              const merged = [...dbWishlist];
+              for (const localItem of localItems) {
+                if (!merged.some((m: WishlistItem) => m.productId === localItem.productId)) {
+                  merged.push(localItem);
+                }
+              }
+              setWishlist(merged);
+              localStorage.removeItem("corase_wishlist");
             } else {
-                setWishlist(dbWishlist);
+              setWishlist(dbWishlist);
             }
           }
         } catch (error) {

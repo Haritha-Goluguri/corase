@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShoppingBag, ArrowRight, Check, Star, Send, MessageSquare } from 'lucide-react';
+import { X, ShoppingBag, ArrowRight, Check, Star, Send, MessageSquare, Camera, Trash2, Lock } from 'lucide-react';
 import { Product, useCart } from '@/context/CartContext';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,7 @@ interface Review {
     userName: string;
     rating: number;
     comment: string;
+    image?: string;
     createdAt: string;
 }
 
@@ -41,14 +42,31 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) => {
     const [reviewRating, setReviewRating] = useState(0);
     const [hoverRating, setHoverRating] = useState(0);
     const [reviewComment, setReviewComment] = useState('');
+    const [reviewImage, setReviewImage] = useState<string | null>(null);
+    const [reviewEligibility, setReviewEligibility] = useState<{
+        isLoggedIn: boolean;
+        hasPurchased: boolean;
+        alreadyReviewed: boolean;
+        canReview: boolean;
+        message: string;
+    } | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [reviewError, setReviewError] = useState('');
     const [reviewSuccess, setReviewSuccess] = useState('');
     const [isSizeChartOpen, setIsSizeChartOpen] = useState(false);
     const [showSizeError, setShowSizeError] = useState(false);
 
-    // Fetch reviews when product changes
+    // Reset selection and image index when product changes
     useEffect(() => {
+        setSelectedSize('');
+        setCurrentImageIndex(0);
+        setShowSizeError(false);
+        setReviewRating(0);
+        setReviewComment('');
+        setReviewImage(null);
+        setReviewError('');
+        setReviewSuccess('');
+
         if (product?.id) {
             fetch(`/api/reviews/${product.id}`)
                 .then(res => res.json())
@@ -56,8 +74,17 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) => {
                     if (Array.isArray(data)) setReviews(data);
                 })
                 .catch(() => setReviews([]));
+
+            if (session?.user) {
+                fetch(`/api/reviews/${product.id}/eligibility`)
+                    .then(res => res.json())
+                    .then(data => setReviewEligibility(data))
+                    .catch(() => setReviewEligibility(null));
+            } else {
+                setReviewEligibility(null);
+            }
         }
-    }, [product?.id]);
+    }, [product?.id, session]);
 
     const handleAddToCart = () => {
         if (!selectedSize) {
@@ -138,7 +165,11 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) => {
             const res = await fetch(`/api/reviews/${product!.id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rating: reviewRating, comment: reviewComment.trim() }),
+                body: JSON.stringify({
+                    rating: reviewRating,
+                    comment: reviewComment.trim(),
+                    image: reviewImage || undefined
+                }),
             });
 
             const data = await res.json();
@@ -151,6 +182,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) => {
             setReviews(prev => [data, ...prev]);
             setReviewComment('');
             setReviewRating(0);
+            setReviewImage(null);
+            setReviewEligibility(prev => prev ? { ...prev, canReview: false, alreadyReviewed: true } : null);
             setReviewSuccess('Review submitted!');
             setTimeout(() => setReviewSuccess(''), 3000);
         } catch {
@@ -351,15 +384,22 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) => {
                                             </button>
                                         </div>
                                         {showSizeError && (
-                                            <motion.p 
-                                                initial={{ x: -10 }}
-                                                animate={{ x: [0, -5, 5, -5, 5, 0] }}
-                                                className="text-[10px] font-bold text-brand-red mb-2 uppercase tracking-widest"
+                                            <motion.div 
+                                                initial={{ opacity: 0, y: -6 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                className="flex items-center gap-2 text-[10px] font-black text-brand-red mb-3 uppercase tracking-widest bg-brand-red/10 border border-brand-red/30 px-3 py-2 rounded-xl"
                                             >
-                                                Please select a size first!
-                                            </motion.p>
+                                                <span>⚠ Please select a size first to continue!</span>
+                                            </motion.div>
                                         )}
-                                        <div className="grid grid-cols-4 gap-3">
+                                        <motion.div 
+                                            animate={showSizeError ? { x: [0, -8, 8, -8, 8, 0] } : {}}
+                                            transition={{ duration: 0.35 }}
+                                            className={cn(
+                                                "grid grid-cols-4 gap-3 p-1 rounded-2xl transition-all",
+                                                showSizeError ? "ring-2 ring-brand-red/60 bg-brand-red/5" : ""
+                                            )}
+                                        >
                                             {filterSizesByCategory(
                                                 (product.variants || product.sizes || []).map((v: any) => typeof v === 'string' ? v : v.size),
                                                 product.category
@@ -370,26 +410,31 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) => {
                                                     <button
                                                         key={size}
                                                         disabled={isOutOfStock}
-                                                        onClick={() => !isOutOfStock && setSelectedSize(size)}
+                                                        onClick={() => {
+                                                            if (!isOutOfStock) {
+                                                                setSelectedSize(size);
+                                                                setShowSizeError(false);
+                                                            }
+                                                        }}
                                                         className={cn(
-                                                            "relative h-14 border font-bold font-syncopate text-[10px] transition-all duration-500 rounded-xl overflow-hidden",
+                                                            "relative h-14 border font-bold font-syncopate text-[10px] transition-all duration-300 rounded-xl overflow-hidden cursor-pointer",
                                                             selectedSize === size 
-                                                                ? "bg-foreground text-background border-foreground shadow-[0_0_20px_rgba(255,255,255,0.2)]" 
+                                                                ? "bg-foreground text-background border-foreground shadow-[0_0_25px_rgba(255,255,255,0.25)] scale-[1.03]" 
                                                                 : isOutOfStock 
-                                                                    ? "bg-foreground/10 text-foreground/20 border-foreground/5 cursor-not-allowed"
-                                                                    : "bg-transparent text-foreground/70 border-foreground/10 hover:border-foreground/30 hover:text-foreground"
+                                                                    ? "bg-foreground/5 text-foreground/25 border-foreground/5 cursor-not-allowed line-through" 
+                                                                    : "bg-transparent text-foreground/70 border-foreground/10 hover:border-foreground/40 hover:text-foreground hover:scale-[1.02]"
                                                         )}
                                                     >
-                                                        {size}
+                                                        <span className={isOutOfStock ? "line-through opacity-30" : ""}>{size}</span>
                                                         {isOutOfStock && (
                                                             <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px]">
-                                                                <span className="text-[7px] tracking-[0.3em] font-black text-white/50 -rotate-12 border border-white/10 px-2 py-0.5 rounded-full">SOLD</span>
+                                                                <span className="text-[7px] tracking-[0.2em] font-black text-red-400 -rotate-12 border border-red-500/30 px-2 py-0.5 rounded-full bg-red-950/40">✕ SOLD</span>
                                                             </div>
                                                         )}
                                                     </button>
                                                 );
                                             })}
-                                        </div>
+                                        </motion.div>
                                         {selectedSize && (() => {
                                             const variant = product.variants?.find((v: { size: string; stock: number }) => v.size === selectedSize);
                                             if (variant && variant.stock <= 3 && variant.stock > 0) {
@@ -410,44 +455,77 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) => {
                                         </p>
                                     </div>
 
-                                    <div className="flex flex-col gap-3">
+                                    {/* ══ MYNTRA-STYLE REACTIVE ACTION BUTTONS ══ */}
+                                    <div className="flex flex-col gap-3 pt-2">
+                                        <AnimatePresence>
+                                            {selectedSize && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: -6, height: 0 }}
+                                                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                                                    exit={{ opacity: 0, y: -6, height: 0 }}
+                                                    className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-brand-red/10 border border-brand-red/30 text-brand-red text-[11px] font-bold overflow-hidden"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <Check size={14} className="stroke-[3]" />
+                                                        <span>Size <span className="underline font-black">{selectedSize}</span> Selected</span>
+                                                    </div>
+                                                    <span className="text-[9px] tracking-widest uppercase font-mono text-foreground/70">
+                                                        Ready to Bag • Fast Dispatch
+                                                    </span>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+
+                                        {/* ADD TO BAG (Myntra Hero CTA) */}
                                         <button 
                                             type="button"
                                             onClick={handleAddToCart}
                                             disabled={isAdding}
                                             className={cn(
-                                                "w-full py-5 rounded-xl font-black tracking-[0.2em] text-[10px] flex items-center justify-center space-x-3 transition-all duration-500 group border border-foreground/10",
-                                                !selectedSize ? "bg-foreground/5 text-foreground/20" : isAdding ? "bg-foreground/10 text-foreground" : "bg-foreground/5 text-foreground hover:bg-foreground/10"
+                                                "relative w-full py-5 rounded-xl font-black tracking-[0.2em] text-[10px] flex items-center justify-center space-x-3 transition-all duration-300 group overflow-hidden cursor-pointer",
+                                                !selectedSize 
+                                                    ? "bg-foreground/5 text-foreground/40 border border-foreground/10 hover:border-foreground/20 hover:text-foreground/60" 
+                                                    : isAdding 
+                                                        ? "bg-emerald-600 text-white shadow-[0_10px_30px_rgba(16,185,129,0.4)]" 
+                                                        : "bg-gradient-to-r from-brand-red via-red-600 to-[#d9121b] text-white shadow-[0_12px_35px_rgba(255,30,39,0.45)] hover:shadow-[0_16px_45px_rgba(255,30,39,0.65)] hover:scale-[1.02] active:scale-[0.98] ring-2 ring-brand-red/40 hover:ring-brand-red"
                                             )}
                                         >
                                             {isAdding ? (
                                                 <motion.div 
                                                     initial={{ scale: 0 }} 
                                                     animate={{ scale: 1 }} 
-                                                    className="flex items-center space-x-2"
+                                                    className="flex items-center space-x-2 font-black tracking-[0.25em]"
                                                 >
-                                                    <Check size={16} />
-                                                    <span>ADDED</span>
+                                                    <Check size={16} className="stroke-[3]" />
+                                                    <span>ADDED TO BAG</span>
                                                 </motion.div>
                                             ) : (
                                                 <>
-                                                    <ShoppingBag size={16} />
-                                                    <span>ADD TO BAG</span>
+                                                    <ShoppingBag size={16} className={cn("transition-transform duration-300", selectedSize ? "group-hover:-translate-y-0.5 group-hover:scale-110" : "")} />
+                                                    <span>{selectedSize ? "ADD TO BAG" : "SELECT SIZE TO BAG"}</span>
+                                                    {selectedSize && (
+                                                        <span className="absolute right-4 px-2 py-0.5 rounded bg-white/20 text-white text-[9px] font-mono tracking-widest hidden sm:inline-block">
+                                                            {selectedSize}
+                                                        </span>
+                                                    )}
                                                 </>
                                             )}
                                         </button>
 
+                                        {/* BUY IT NOW */}
                                         <button 
                                             type="button"
                                             onClick={handleBuyNow}
                                             disabled={isAdding}
                                             className={cn(
-                                                "w-full py-5 rounded-xl font-black tracking-[0.3em] text-[10px] flex items-center justify-center space-x-3 transition-all duration-500 shadow-[0_20px_50px_rgba(0,0,0,0.1)]",
-                                                !selectedSize ? "bg-foreground/20 text-background/50" : "bg-foreground text-background hover:scale-[1.02]"
+                                                "w-full py-5 rounded-xl font-black tracking-[0.3em] text-[10px] flex items-center justify-center space-x-3 transition-all duration-300 group cursor-pointer",
+                                                !selectedSize 
+                                                    ? "bg-foreground/10 text-foreground/30 border border-foreground/5 hover:bg-foreground/15" 
+                                                    : "bg-foreground text-background shadow-[0_12px_35px_rgba(255,255,255,0.25)] hover:shadow-[0_16px_45px_rgba(255,255,255,0.4)] hover:scale-[1.02] active:scale-[0.98]"
                                             )}
                                         >
                                             <span>BUY IT NOW</span>
-                                            <ArrowRight size={16} />
+                                            <ArrowRight size={16} className={cn("transition-transform duration-300", selectedSize ? "group-hover:translate-x-1" : "")} />
                                         </button>
                                     </div>
 
@@ -468,38 +546,44 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) => {
                                                 {reviews.map((review) => (
                                                     <div
                                                         key={review._id}
-                                                        className="min-w-[260px] max-w-[280px] bg-foreground/[0.03] border border-foreground/5 rounded-2xl p-5 flex-shrink-0 snap-start hover:border-foreground/10 transition-all"
+                                                        className="min-w-[260px] max-w-[280px] bg-foreground/[0.03] border border-foreground/5 rounded-2xl p-4 flex-shrink-0 snap-start hover:border-foreground/10 transition-all flex flex-col justify-between"
                                                     >
-                                                        <div className="flex items-center justify-between mb-3">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="w-7 h-7 rounded-full bg-brand-red/10 flex items-center justify-center">
-                                                                    <span className="text-[9px] font-black text-brand-red uppercase">
-                                                                        {review.userName.charAt(0)}
+                                                        <div>
+                                                            <div className="flex items-center justify-between mb-2.5">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-7 h-7 rounded-full bg-brand-red/10 flex items-center justify-center">
+                                                                        <span className="text-[9px] font-black text-brand-red uppercase">
+                                                                            {review.userName.charAt(0)}
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-[10px] font-black text-foreground uppercase tracking-wider truncate max-w-[110px]">
+                                                                        {review.userName}
                                                                     </span>
                                                                 </div>
-                                                                <span className="text-[10px] font-black text-foreground uppercase tracking-wider truncate max-w-[120px]">
-                                                                    {review.userName}
-                                                                </span>
+                                                                <div className="flex items-center gap-1 bg-yellow-400/10 border border-yellow-400/20 px-2 py-0.5 rounded-full">
+                                                                    <Star size={10} className="fill-yellow-400 text-yellow-400" />
+                                                                    <span className="text-[10px] font-black text-yellow-400">
+                                                                        {review.rating}/10
+                                                                    </span>
+                                                                </div>
                                                             </div>
-                                                            <div className="flex gap-0.5">
-                                                                {[1, 2, 3, 4, 5].map((s) => (
-                                                                    <Star
-                                                                        key={s}
-                                                                        size={10}
-                                                                        className={cn(
-                                                                            s <= review.rating
-                                                                                ? "fill-yellow-400 text-yellow-400"
-                                                                                : "text-foreground/10"
-                                                                        )}
+                                                            <p className="text-xs text-foreground/75 leading-relaxed line-clamp-3 mb-2.5">
+                                                                {review.comment}
+                                                            </p>
+                                                            {review.image && (
+                                                                <div className="relative w-full h-28 rounded-xl overflow-hidden mb-2 border border-foreground/10 bg-black/20">
+                                                                    <Image
+                                                                        src={review.image}
+                                                                        alt={`Review by ${review.userName}`}
+                                                                        fill
+                                                                        sizes="280px"
+                                                                        className="object-cover hover:scale-105 transition-transform duration-300"
                                                                     />
-                                                                ))}
-                                                            </div>
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                        <p className="text-xs text-foreground/70 leading-relaxed line-clamp-3">
-                                                            {review.comment}
-                                                        </p>
-                                                        <p className="text-[9px] text-foreground/20 font-bold mt-3 uppercase tracking-widest">
-                                                            {new Date(review.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                        <p className="text-[9px] text-foreground/20 font-bold uppercase tracking-widest mt-1">
+                                                            {review.createdAt ? new Date(review.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Verified Drop'}
                                                         </p>
                                                     </div>
                                                 ))}
@@ -513,40 +597,62 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) => {
                                             </div>
                                         )}
 
-                                        {/* Write Review Form */}
-                                        {session?.user ? (
-                                            <div className="mt-6 bg-foreground/[0.03] border border-foreground/5 rounded-2xl p-5 space-y-4">
-                                                <p className="text-[10px] font-black tracking-[0.2em] text-foreground uppercase">
-                                                    Write a Review
+                                        {/* Write Review Form / Eligibility Gate */}
+                                        {!session?.user ? (
+                                            <div className="mt-6 text-center py-4 bg-foreground/[0.02] rounded-xl border border-foreground/5">
+                                                <p className="text-[10px] text-foreground/40 font-bold uppercase tracking-widest">
+                                                    Purchased this piece? <button onClick={() => router.push('/login')} className="text-brand-red hover:underline">Sign in</button> to write a verified review
                                                 </p>
+                                            </div>
+                                        ) : reviewEligibility?.alreadyReviewed ? (
+                                            <div className="mt-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2.5">
+                                                <Check size={14} className="text-emerald-400" />
+                                                <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
+                                                    Thank you! You have already reviewed this piece.
+                                                </p>
+                                            </div>
+                                        ) : reviewEligibility && !reviewEligibility.hasPurchased ? (
+                                            <div className="mt-6 p-4 bg-foreground/[0.02] rounded-xl border border-foreground/5 flex items-center gap-3">
+                                                <div className="w-7 h-7 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 flex-shrink-0">
+                                                    <Lock size={12} />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase tracking-wider text-foreground">Verified Buyers Only</p>
+                                                    <p className="text-[9px] text-foreground/40 mt-0.5">Only customers who have ordered this item can leave a review.</p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="mt-6 bg-foreground/[0.03] border border-foreground/5 rounded-2xl p-5 space-y-4">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-[10px] font-black tracking-[0.2em] text-foreground uppercase">
+                                                        Write a Review
+                                                    </p>
+                                                    <span className="text-[10px] font-black text-yellow-400">
+                                                        {reviewRating > 0 ? `${reviewRating}/10 Rating` : 'Select score 1-10'}
+                                                    </span>
+                                                </div>
 
-                                                {/* Star Rating Input */}
-                                                <div className="flex items-center gap-1">
-                                                    {[1, 2, 3, 4, 5].map((s) => (
-                                                        <button
-                                                            key={s}
-                                                            type="button"
-                                                            onClick={() => setReviewRating(s)}
-                                                            onMouseEnter={() => setHoverRating(s)}
-                                                            onMouseLeave={() => setHoverRating(0)}
-                                                            className="p-1 transition-transform hover:scale-125"
-                                                        >
-                                                            <Star
-                                                                size={18}
+                                                {/* 1-10 Rating Input Grid */}
+                                                <div>
+                                                    <div className="grid grid-cols-10 gap-1">
+                                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((s) => (
+                                                            <button
+                                                                key={s}
+                                                                type="button"
+                                                                onClick={() => setReviewRating(s)}
+                                                                onMouseEnter={() => setHoverRating(s)}
+                                                                onMouseLeave={() => setHoverRating(0)}
                                                                 className={cn(
-                                                                    "transition-colors",
-                                                                    s <= (hoverRating || reviewRating)
-                                                                        ? "fill-yellow-400 text-yellow-400"
-                                                                        : "text-foreground/15 hover:text-foreground/30"
+                                                                    "py-1.5 rounded-lg text-[10px] font-black transition-all border",
+                                                                    (hoverRating || reviewRating) >= s
+                                                                        ? "bg-yellow-400 text-black border-yellow-400 shadow-sm"
+                                                                        : "bg-foreground/5 border-foreground/10 text-foreground/50 hover:border-foreground/30"
                                                                 )}
-                                                            />
-                                                        </button>
-                                                    ))}
-                                                    {reviewRating > 0 && (
-                                                        <span className="text-[9px] font-bold text-foreground/40 ml-2 uppercase tracking-widest">
-                                                            {['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent'][reviewRating]}
-                                                        </span>
-                                                    )}
+                                                            >
+                                                                {s}
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 </div>
 
                                                 {/* Comment Input */}
@@ -554,7 +660,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) => {
                                                     <textarea
                                                         value={reviewComment}
                                                         onChange={(e) => setReviewComment(e.target.value)}
-                                                        placeholder="Share your thoughts on this piece..."
+                                                        placeholder="Share your thoughts on the fit, fabric, and styling..."
                                                         maxLength={500}
                                                         rows={3}
                                                         className="w-full bg-foreground/5 border border-foreground/10 rounded-xl px-4 py-3 text-xs text-foreground placeholder-foreground/20 focus:outline-none focus:border-foreground/20 transition-all resize-none"
@@ -562,6 +668,51 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) => {
                                                     <span className="absolute bottom-3 right-3 text-[9px] text-foreground/15 font-bold">
                                                         {reviewComment.length}/500
                                                     </span>
+                                                </div>
+
+                                                {/* Picture Attachment */}
+                                                <div>
+                                                    {reviewImage ? (
+                                                        <div className="relative w-20 h-20 rounded-xl overflow-hidden border border-foreground/10 group">
+                                                            <Image
+                                                                src={reviewImage}
+                                                                alt="Review preview"
+                                                                fill
+                                                                className="object-cover"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setReviewImage(null)}
+                                                                className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 flex items-center justify-center text-red-400 transition-opacity"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-foreground/5 border border-foreground/10 text-foreground/60 hover:text-foreground hover:bg-foreground/10 cursor-pointer text-[10px] font-black uppercase tracking-wider transition-all">
+                                                            <Camera size={14} className="text-foreground/40" />
+                                                            <span>Attach Picture</span>
+                                                            <input
+                                                                type="file"
+                                                                accept="image/*"
+                                                                className="hidden"
+                                                                onChange={(e) => {
+                                                                    const file = e.target.files?.[0];
+                                                                    if (!file) return;
+                                                                    if (file.size > 5 * 1024 * 1024) {
+                                                                        setReviewError("Image must be under 5MB");
+                                                                        return;
+                                                                    }
+                                                                    const reader = new FileReader();
+                                                                    reader.onloadend = () => {
+                                                                        setReviewImage(reader.result as string);
+                                                                        setReviewError("");
+                                                                    };
+                                                                    reader.readAsDataURL(file);
+                                                                }}
+                                                            />
+                                                        </label>
+                                                    )}
                                                 </div>
 
                                                 {/* Error / Success */}
@@ -581,12 +732,6 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose }) => {
                                                     <Send size={12} />
                                                     {isSubmitting ? 'Submitting...' : 'Submit Review'}
                                                 </button>
-                                            </div>
-                                        ) : (
-                                            <div className="mt-6 text-center py-4 bg-foreground/[0.02] rounded-xl border border-foreground/5">
-                                                <p className="text-[10px] text-foreground/30 font-bold uppercase tracking-widest">
-                                                    <button onClick={() => router.push('/login')} className="text-brand-red hover:underline">Sign in</button> to write a review
-                                                </p>
                                             </div>
                                         )}
                                     </div>
