@@ -151,6 +151,7 @@ export default function AdminDashboard() {
                     images: savedProduct.images || [],
                     image: savedProduct.images?.[0] || "",
                     variants: savedProduct.variants,
+                    sizes: (savedProduct.variants || []).map((v: any) => v.size),
                     isNewDrop: savedProduct.isNewDrop,
                     isFeatured: savedProduct.isFeatured,
                     status: savedProduct.status || "none",
@@ -195,6 +196,43 @@ export default function AdminDashboard() {
             alert("Error deleting product");
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleToggleVariantStock = async (productId: string, size: string, currentStock: number) => {
+        const targetProduct = products.find(p => p.id === productId);
+        if (!targetProduct || !targetProduct.variants) return;
+
+        const newStock = currentStock > 0 ? 0 : 10;
+        const updatedVariants = targetProduct.variants.map((v: any) => 
+            v.size === size ? { ...v, stock: newStock } : v
+        );
+
+        // Optimistic UI update
+        setProducts(prev => prev.map(p => 
+            p.id === productId ? { ...p, variants: updatedVariants } : p
+        ));
+
+        try {
+            const res = await fetch(`/api/admin/products/${productId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ variants: updatedVariants })
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                alert(err.error || "Failed to update size stock");
+                setProducts(prev => prev.map(p => 
+                    p.id === productId ? targetProduct : p
+                ));
+            }
+        } catch (error) {
+            console.error("Error toggling stock:", error);
+            alert("Network error updating size stock");
+            setProducts(prev => prev.map(p => 
+                p.id === productId ? targetProduct : p
+            ));
         }
     };
 
@@ -339,62 +377,58 @@ export default function AdminDashboard() {
         (p.category?.toLowerCase() || '').includes(searchTerm.toLowerCase())
     );
 
-    const Sidebar = () => (
-        <aside className={`
-            fixed top-0 left-0 h-full w-72
-            bg-background border-r border-foreground/10
-            flex flex-col z-40
-            transition-transform duration-300 ease-out
-            ${open ? 'translate-x-0' : '-translate-x-full'}
-            lg:translate-x-0
-        `}>
-            <div className="p-8 border-b border-foreground/5">
-                <div className="flex items-center gap-4">
-                    <div>
-                        <h2 className="text-2xl font-black font-syncopate text-brand-red tracking-tight leading-none uppercase">Corase</h2>
-                        <span className="text-[10px] font-bold text-foreground/90 uppercase tracking-[0.2em] mt-1 block">Control Center</span>
-                    </div>
-                </div>
-            </div>
-
-            <nav className="flex-1 p-6 space-y-2">
-                {NAV.map(({ icon: Icon, label, tab: t }) => (
-                    <button
-                        key={t}
-                        onClick={() => { setTab(t); setOpen(false); }}
-                        className={`
-                            w-full flex items-center gap-4 px-5 py-4 rounded-xl
-                            text-sm font-bold tracking-wider uppercase transition-all
-                            ${tab === t 
-                                ? 'bg-foreground text-background shadow-xl shadow-foreground/10' 
-                                : 'text-foreground/40 hover:text-foreground hover:bg-foreground/5'}
-                        `}
-                    >
-                        <Icon size={18} className={tab === t ? 'text-brand-red' : ''} />
-                        <span className="flex-1 text-left">{label}</span>
-                        {t === 'payments' && pendingUPIPayments > 0 && (
-                            <span className="bg-brand-red text-white text-[9px] font-black px-2 py-0.5 rounded-full">
-                                {pendingUPIPayments}
-                            </span>
-                        )}
-                    </button>
-                ))}
-            </nav>
-
-            <div className="p-6 border-t border-foreground/5 space-y-2">
-                <Link href="/" className="flex items-center gap-4 px-5 py-3 rounded-xl text-xs font-bold text-foreground/60 hover:text-foreground hover:bg-foreground/5 uppercase tracking-widest transition-all">
-                    <Eye size={16} /> Live Site
-                </Link>
-                <button onClick={() => signOut()} className="w-full flex items-center gap-4 px-5 py-3 rounded-xl text-xs font-bold text-red-500/60 hover:text-red-400 hover:bg-red-500/5 uppercase tracking-widest transition-all">
-                    <LogOut size={16} /> Sign Out
-                </button>
-            </div>
-        </aside>
-    );
-
     return (
         <div className="min-h-screen bg-background text-foreground">
-            <Sidebar />
+            <aside className={`
+                fixed top-0 left-0 h-full w-72
+                bg-background border-r border-foreground/10
+                flex flex-col z-40
+                transition-transform duration-300 ease-out
+                ${open ? 'translate-x-0' : '-translate-x-full'}
+                lg:translate-x-0
+            `}>
+                <div className="p-8 border-b border-foreground/5">
+                    <div className="flex items-center gap-4">
+                        <div>
+                            <h2 className="text-2xl font-black font-syncopate text-brand-red tracking-tight leading-none uppercase">Corase</h2>
+                            <span className="text-[10px] font-bold text-foreground/90 uppercase tracking-[0.2em] mt-1 block">Control Center</span>
+                        </div>
+                    </div>
+                </div>
+
+                <nav className="flex-1 p-6 space-y-2">
+                    {NAV.map(({ icon: Icon, label, tab: t }) => (
+                        <button
+                            key={t}
+                            onClick={() => { setTab(t); setOpen(false); }}
+                            className={`
+                                w-full flex items-center gap-4 px-5 py-4 rounded-xl
+                                text-sm font-bold tracking-wider uppercase transition-all
+                                ${tab === t 
+                                    ? 'bg-foreground text-background shadow-xl shadow-foreground/10' 
+                                    : 'text-foreground/40 hover:text-foreground hover:bg-foreground/5'}
+                            `}
+                        >
+                            <Icon size={18} className={tab === t ? 'text-brand-red' : ''} />
+                            <span className="flex-1 text-left">{label}</span>
+                            {t === 'payments' && pendingUPIPayments > 0 && (
+                                <span className="bg-brand-red text-white text-[9px] font-black px-2 py-0.5 rounded-full">
+                                    {pendingUPIPayments}
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </nav>
+
+                <div className="p-6 border-t border-foreground/5 space-y-2">
+                    <Link href="/" className="flex items-center gap-4 px-5 py-3 rounded-xl text-xs font-bold text-foreground/60 hover:text-foreground hover:bg-foreground/5 uppercase tracking-widest transition-all">
+                        <Eye size={16} /> Live Site
+                    </Link>
+                    <button onClick={() => signOut()} className="w-full flex items-center gap-4 px-5 py-3 rounded-xl text-xs font-bold text-red-500/60 hover:text-red-400 hover:bg-red-500/5 uppercase tracking-widest transition-all">
+                        <LogOut size={16} /> Sign Out
+                    </button>
+                </div>
+            </aside>
 
             <div className="lg:ml-72 min-h-screen flex flex-col">
                 <header className="sticky top-0 z-20 bg-background/80 backdrop-blur-xl border-b border-foreground/5 px-4 md:px-8 py-4 md:py-6">
@@ -728,15 +762,47 @@ export default function AdminDashboard() {
                                                 
                                                 <div className="space-y-2">
                                                     <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-foreground/60">
-                                                        <span>Size / Stock</span>
-                                                        <span className={stock < 20 ? 'text-red-400' : 'text-emerald-400'}>{stock} TOTAL</span>
+                                                        <span>Size / Stock <span className="text-[8px] text-foreground/40 font-normal lowercase">(click to toggle out of stock)</span></span>
+                                                        <span className={stock < 20 ? 'text-red-400 font-black' : 'text-emerald-400 font-black'}>{stock} TOTAL</span>
                                                     </div>
                                                     <div className="flex flex-wrap gap-1.5">
-                                                        {p.variants?.map((v: any) => (
-                                                            <div key={v.size} className={`px-2.5 py-1.5 rounded text-[10px] font-black uppercase border ${v.stock < 5 ? 'border-red-500/30 bg-red-500/5 text-red-400' : 'border-foreground/20 bg-foreground/5 text-foreground/90'}`}>
-                                                                {v.size}: {v.stock}
-                                                            </div>
-                                                        ))}
+                                                        {p.variants?.map((v: any) => {
+                                                            const isOutOfStock = Number(v.stock) === 0;
+                                                            return (
+                                                                <button
+                                                                    key={v.size}
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleToggleVariantStock(p.id, v.size, v.stock);
+                                                                    }}
+                                                                    title={isOutOfStock ? `Size ${v.size} is OUT OF STOCK. Click to restock (+10).` : `Size ${v.size} has ${v.stock} in stock. Click to cross out (mark Out of Stock).`}
+                                                                    className={`group/sz relative px-2.5 py-1.5 rounded text-[10px] font-black uppercase border transition-all cursor-pointer flex items-center gap-1.5 ${
+                                                                        isOutOfStock 
+                                                                            ? 'border-red-500/40 bg-red-500/15 text-red-400 hover:bg-red-500/25 shadow-sm' 
+                                                                            : v.stock < 5 
+                                                                                ? 'border-amber-500/30 bg-amber-500/10 text-amber-300 hover:border-red-500/40 hover:bg-red-500/10' 
+                                                                                : 'border-foreground/20 bg-foreground/5 text-foreground/90 hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300'
+                                                                    }`}
+                                                                >
+                                                                    <span className={isOutOfStock ? "line-through opacity-70" : ""}>
+                                                                        {v.size}
+                                                                    </span>
+                                                                    <span className="text-[9px] opacity-60 font-mono">
+                                                                        ({v.stock})
+                                                                    </span>
+                                                                    {isOutOfStock ? (
+                                                                        <span className="text-[8px] font-black uppercase px-1 rounded bg-red-500/30 text-red-300">
+                                                                            ✕ SOLD
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="opacity-0 group-hover/sz:opacity-100 text-[8px] font-bold text-red-400 transition-opacity">
+                                                                            ✕
+                                                                        </span>
+                                                                    )}
+                                                                </button>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
 

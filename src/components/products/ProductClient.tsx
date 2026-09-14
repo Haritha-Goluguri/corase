@@ -3,12 +3,13 @@
 import React, { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { ArrowLeft, Heart, Minus, Plus, Truck, RotateCcw, Shield, ChevronLeft, ChevronRight } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowLeft, Heart, Minus, Plus, Truck, RotateCcw, Shield, ChevronLeft, ChevronRight, ShoppingBag, ArrowRight, Check } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import ProductReviews from "@/components/products/ProductReviews";
 
 interface ProductClientProps {
   productId: string;
@@ -22,6 +23,7 @@ export default function ProductClient({ productId, initialProduct }: ProductClie
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [sizeError, setSizeError] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const { addToCart, setIsOpen, setBuyNowItem } = useCart();
@@ -88,9 +90,11 @@ export default function ProductClient({ productId, initialProduct }: ProductClie
   const handleAddToCart = () => {
     if (!selectedSize) {
       setSizeError(true);
+      setTimeout(() => setSizeError(false), 2500);
       return;
     }
     setSizeError(false);
+    setIsAdding(true);
     const cartProduct = {
       productId: product.id,
       name: product.name,
@@ -100,11 +104,15 @@ export default function ProductClient({ productId, initialProduct }: ProductClie
       quantity: quantity,
     };
     addToCart(cartProduct);
+    setTimeout(() => {
+      setIsAdding(false);
+    }, 1200);
   };
 
   const handleBuyNow = () => {
     if (!selectedSize) {
       setSizeError(true);
+      setTimeout(() => setSizeError(false), 2500);
       return;
     }
     setSizeError(false);
@@ -271,13 +279,35 @@ export default function ProductClient({ productId, initialProduct }: ProductClie
 
             {/* Size Selector */}
             <div className="mb-8">
-              <p className="text-[10px] font-bold tracking-[0.3em] uppercase text-white/60 mb-4">
-                Select Size{" "}
-                {sizeError && (
-                  <span className="text-red-400 ml-2">— Please select a size</span>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[10px] font-bold tracking-[0.3em] uppercase text-white/60">
+                  Select Size
+                </p>
+                {selectedSize && (
+                  <span className="text-[10px] font-mono text-brand-red font-bold">
+                    ✓ Size {selectedSize} Selected
+                  </span>
                 )}
-              </p>
-              <div className="flex flex-wrap gap-3">
+              </div>
+
+              {sizeError && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-center gap-2 text-[10px] font-black text-brand-red mb-3 uppercase tracking-widest bg-brand-red/10 border border-brand-red/30 px-3 py-2 rounded-xl"
+                >
+                  <span>⚠ Please select a size first to continue!</span>
+                </motion.div>
+              )}
+
+              <motion.div 
+                animate={sizeError ? { x: [0, -8, 8, -8, 8, 0] } : {}}
+                transition={{ duration: 0.35 }}
+                className={cn(
+                  "flex flex-wrap gap-3 p-1 rounded-2xl transition-all",
+                  sizeError ? "ring-2 ring-brand-red/60 bg-brand-red/5" : ""
+                )}
+              >
                 {(product.sizes || (product.variants || []).map((v: any) => v.size)).map((size: string) => {
                   const variant = product.variants?.find((v: any) => v.size === size);
                   const outOfStock = variant ? variant.stock === 0 : false;
@@ -286,22 +316,30 @@ export default function ProductClient({ productId, initialProduct }: ProductClie
                       key={size}
                       disabled={outOfStock}
                       onClick={() => {
-                        if (!outOfStock) { setSelectedSize(size); setSizeError(false); }
+                        if (!outOfStock) { 
+                          setSelectedSize(size); 
+                          setSizeError(false); 
+                        }
                       }}
-                      className={`relative min-w-[48px] h-12 px-4 rounded-sm text-sm font-bold border transition-all ${
+                      className={cn(
+                        "relative min-w-[54px] h-12 px-4 rounded-xl text-xs font-bold border transition-all overflow-hidden cursor-pointer",
                         selectedSize === size
-                          ? "bg-white text-black border-white"
+                          ? "bg-white text-black border-white shadow-[0_0_25px_rgba(255,255,255,0.25)] scale-[1.05]"
                           : outOfStock
-                          ? "border-white/10 text-white/20 cursor-not-allowed line-through"
-                          : "border-white/20 text-white/70 hover:border-white/50 hover:text-white"
-                      }`}
+                          ? "border-white/5 bg-white/[0.02] text-white/20 cursor-not-allowed line-through"
+                          : "border-white/20 text-white/70 hover:border-white/50 hover:text-white hover:scale-[1.02]"
+                      )}
                     >
-                      {size}
-                      {outOfStock && <span className="absolute -top-2 -right-2 text-[7px] bg-red-500/20 text-red-400 px-1 rounded uppercase font-black">Out</span>}
+                      <span className={outOfStock ? "line-through opacity-30" : ""}>{size}</span>
+                      {outOfStock && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-[1px]">
+                          <span className="text-[7px] tracking-[0.2em] font-black text-red-400 -rotate-12 border border-red-500/30 px-1.5 py-0.5 rounded-full bg-red-950/40">✕ SOLD</span>
+                        </div>
+                      )}
                     </button>
                   );
                 })}
-              </div>
+              </motion.div>
             </div>
 
             {/* Quantity */}
@@ -309,10 +347,10 @@ export default function ProductClient({ productId, initialProduct }: ProductClie
               <p className="text-[10px] font-bold tracking-[0.3em] uppercase text-white/30 mb-4">
                 Quantity
               </p>
-              <div className="flex items-center border border-white/15 rounded-sm w-fit">
+              <div className="flex items-center border border-white/15 rounded-xl w-fit overflow-hidden">
                 <button
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="w-12 h-12 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                  className="w-12 h-12 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
                 >
                   <Minus size={14} />
                 </button>
@@ -321,22 +359,70 @@ export default function ProductClient({ productId, initialProduct }: ProductClie
                 </span>
                 <button
                   onClick={() => setQuantity(quantity + 1)}
-                  className="w-12 h-12 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+                  className="w-12 h-12 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
                 >
                   <Plus size={14} />
                 </button>
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex flex-col gap-4 mb-12">
+            {/* Actions (Myntra-style reactive highlight) */}
+            <div className="flex flex-col gap-3 mb-12">
+              <AnimatePresence>
+                {selectedSize && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    exit={{ opacity: 0, y: -6, height: 0 }}
+                    className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-brand-red/10 border border-brand-red/30 text-brand-red text-[11px] font-bold overflow-hidden"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Check size={14} className="stroke-[3]" />
+                      <span>Size <span className="underline font-black">{selectedSize}</span> Selected</span>
+                    </div>
+                    <span className="text-[9px] tracking-widest uppercase font-mono text-white/70">
+                      Ready to Bag • Fast Dispatch
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="flex gap-3">
+                {/* ADD TO BAG (Myntra Hero CTA) */}
                 <button
                   onClick={handleAddToCart}
-                  className="flex-1 bg-white/[0.06] border border-white/10 text-white py-4 rounded-sm font-black text-xs tracking-[0.2em] uppercase hover:bg-white/10 transition-colors"
+                  disabled={isAdding}
+                  className={cn(
+                    "relative flex-1 py-4 sm:py-5 rounded-xl font-black text-xs tracking-[0.2em] uppercase transition-all duration-300 flex items-center justify-center gap-3 group cursor-pointer overflow-hidden",
+                    !selectedSize
+                      ? "bg-white/[0.05] border border-white/10 text-white/40 hover:border-white/20 hover:text-white/60"
+                      : isAdding
+                      ? "bg-emerald-600 text-white shadow-[0_12px_35px_rgba(16,185,129,0.4)]"
+                      : "bg-gradient-to-r from-brand-red via-red-600 to-[#d9121b] text-white shadow-[0_12px_35px_rgba(255,30,39,0.45)] hover:shadow-[0_16px_45px_rgba(255,30,39,0.65)] hover:scale-[1.02] active:scale-[0.98] ring-2 ring-brand-red/40 hover:ring-brand-red"
+                  )}
                 >
-                  Add to Cart
+                  {isAdding ? (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="flex items-center gap-2 font-black tracking-[0.25em]"
+                    >
+                      <Check size={16} className="stroke-[3]" />
+                      <span>ADDED TO BAG</span>
+                    </motion.div>
+                  ) : (
+                    <>
+                      <ShoppingBag size={16} className={cn("transition-transform duration-300", selectedSize ? "group-hover:-translate-y-0.5 group-hover:scale-110" : "")} />
+                      <span>{selectedSize ? "ADD TO BAG" : "SELECT SIZE TO BAG"}</span>
+                      {selectedSize && (
+                        <span className="hidden sm:inline-block px-2 py-0.5 rounded bg-white/20 text-white text-[9px] font-mono tracking-widest">
+                          {selectedSize}
+                        </span>
+                      )}
+                    </>
+                  )}
                 </button>
+
                 <button
                   onClick={() =>
                     toggleWishlist({
@@ -346,20 +432,29 @@ export default function ProductClient({ productId, initialProduct }: ProductClie
                       image: product.image,
                     })
                   }
-                  className={`w-12 h-12 sm:w-14 sm:h-14 rounded-sm border flex items-center justify-center transition-all ${
+                  className={cn(
+                    "w-12 sm:w-14 h-auto rounded-xl border flex items-center justify-center transition-all cursor-pointer",
                     wishlisted
                       ? "bg-white text-black border-white"
                       : "border-white/15 text-white/50 hover:text-white hover:border-white/40"
-                  }`}
+                  )}
                 >
                   <Heart size={16} className="sm:w-[18px] sm:h-[18px]" fill={wishlisted ? "currentColor" : "none"} />
                 </button>
               </div>
+
+              {/* BUY IT NOW */}
               <button
                 onClick={handleBuyNow}
-                className="w-full bg-white text-black py-5 rounded-sm font-black text-[10px] tracking-[0.4em] uppercase hover:bg-gray-200 transition-all transform hover:scale-[1.01] active:scale-[0.99] shadow-[0_20px_50px_rgba(255,255,255,0.1)]"
+                className={cn(
+                  "w-full py-5 rounded-xl font-black text-[10px] sm:text-xs tracking-[0.35em] uppercase transition-all duration-300 flex items-center justify-center gap-3 cursor-pointer group",
+                  !selectedSize
+                    ? "bg-white/10 text-white/30 border border-white/5 hover:bg-white/15"
+                    : "bg-white text-black shadow-[0_12px_35px_rgba(255,255,255,0.25)] hover:shadow-[0_16px_45px_rgba(255,255,255,0.4)] hover:bg-gray-100 hover:scale-[1.02] active:scale-[0.98]"
+                )}
               >
-                Buy Now — ₹{product.price * quantity}
+                <span>BUY NOW — ₹{product.price * quantity}</span>
+                <ArrowRight size={16} className={cn("transition-transform duration-300", selectedSize ? "group-hover:translate-x-1" : "")} />
               </button>
             </div>
 
@@ -379,6 +474,11 @@ export default function ProductClient({ productId, initialProduct }: ProductClie
             </div>
           </motion.div>
         </div>
+
+        {/* Customer Reviews & Ratings (1 to 10 with pictures) */}
+        {product && (
+          <ProductReviews productId={product.id} productName={product.name} />
+        )}
 
         {/* Related Products */}
         {relatedProducts.length > 0 && (

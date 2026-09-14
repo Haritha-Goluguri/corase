@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connectToDatabase } from "@/lib/mongoose";
 import Product from "@/models/Product";
 import ProductClient from "@/components/products/ProductClient";
+import mongoose from "mongoose";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -11,20 +12,27 @@ interface Props {
 async function getProduct(id: string) {
   try {
     await connectToDatabase();
-    const rawProduct = await Product.findOne({ id }).lean();
+    const isValidMongoId = mongoose.Types.ObjectId.isValid(id);
+    const rawProduct = await Product.findOne(
+      isValidMongoId ? { $or: [{ id }, { _id: id }] } : { id }
+    ).lean();
     
     if (!rawProduct) return null;
 
+    const images = (rawProduct as any).images || [];
+    const variants = rawProduct.variants || [];
+
     // Map to the format used in the frontend
     return {
-      id: rawProduct.id,
+      id: rawProduct.id || (rawProduct as any)._id?.toString(),
       name: (rawProduct as any).title,
       price: rawProduct.price,
       description: rawProduct.description,
-      image: (rawProduct as any).images[0],
+      images: images,
+      image: images[0] || "/placeholder.jpg",
       category: rawProduct.category || "Tshirts",
-      variants: rawProduct.variants,
-      sizes: rawProduct.variants.map((v: any) => v.size),
+      variants: variants,
+      sizes: variants.map((v: any) => v.size),
       isNewDrop: rawProduct.isNewDrop,
       isFeatured: rawProduct.isFeatured,
       color: "#ffffff",

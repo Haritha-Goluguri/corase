@@ -41,10 +41,19 @@ function ShopPageInner() {
   const [isSaving, setIsSaving] = useState(false);
   const { toggleWishlist, isWishlisted } = useWishlist();
 
-  // Keep searchTerm in sync when URL param changes (e.g. navbar search)
+  // Keep searchTerm and filter in sync when URL param changes
   useEffect(() => {
     const q = searchParams.get("q");
     if (q !== null) setSearchTerm(q);
+
+    const filter = searchParams.get("filter");
+    if (filter) {
+      if (filter === "new") {
+        setSortBy("newest");
+      } else {
+        setSearchTerm(filter);
+      }
+    }
   }, [searchParams]);
 
   useEffect(() => {
@@ -52,9 +61,10 @@ function ShopPageInner() {
       try {
         const res = await fetch("/api/products");
         const data = await res.json();
-        setAllProducts(data);
+        setAllProducts(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Failed to fetch products:", error);
+        setAllProducts([]);
       } finally {
         setLoading(false);
       }

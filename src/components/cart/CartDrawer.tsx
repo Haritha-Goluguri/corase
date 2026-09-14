@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag, X, Minus, Plus, ArrowRight, Ticket, Tag } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import Image from 'next/image';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 const CartDrawer: React.FC = () => {
@@ -162,26 +163,33 @@ const CartDrawer: React.FC = () => {
                                              <span>-₹{totalPrice - discountedTotal}</span>
                                          </div>
                                      )}
-                                     <div className="flex justify-between text-[10px] font-bold text-foreground/50 uppercase tracking-widest">
-                                         <span>Shipping</span>
-                                         <span>₹49</span>
-                                     </div>
-                                     <div className="flex justify-between text-xs font-bold font-syncopate text-foreground uppercase italic border-t border-foreground/5 pt-4">
-                                         <span>Total</span>
-                                         <span className="text-foreground font-black">₹{discountedTotal + (cart.length > 0 ? 49 : 0)}</span>
-                                     </div>
+                                                                          {(() => {
+                                         const shipping = cart.length === 0 ? 0 : (totalPrice >= 999 ? 0 : 69);
+                                         return (
+                                             <>
+                                                 <div className="flex justify-between text-[10px] font-bold text-foreground/50 uppercase tracking-widest">
+                                                     <span>Shipping</span>
+                                                     <span>{shipping === 0 ? <span className="text-emerald-400">FREE</span> : `₹${shipping}`}</span>
+                                                 </div>
+                                                 <div className="flex justify-between text-xs font-bold font-syncopate text-foreground uppercase italic border-t border-foreground/5 pt-4">
+                                                     <span>Total</span>
+                                                     <span className="text-foreground font-black">₹{discountedTotal + shipping}</span>
+                                                 </div>
+                                             </>
+                                         );
+                                     })()}
                                  </div>
-                                 <a
+                                 <Link
                                      href="/checkout"
-                                     onClick={(e) => {
+                                     onClick={() => {
                                          clearBuyNowItem();
                                          setIsOpen(false);
                                      }}
-                                     className="w-full bg-foreground text-background py-5 rounded-full font-black tracking-[0.4em] text-[10px] hover:bg-foreground/80 active:scale-95 transition-all shadow-[0_10px_30px_rgba(0,0,0,0.1)] flex items-center justify-center space-x-2 group uppercase"
+                                     className="w-full bg-foreground text-background py-5 rounded-full font-black tracking-[0.4em] text-[10px] hover:bg-foreground/80 active:scale-95 transition-all shadow-[0_10px_30px_rgba(0,0,0,0.1)] flex items-center justify-center space-x-2 group uppercase cursor-pointer"
                                  >
                                     <span>PROCEED TO CHECKOUT</span>
                                     <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" />
-                                </a>
+                                </Link>
                             </div>
                         )}
                     </motion.div>

@@ -13,16 +13,16 @@ const cld = (name: string) =>
     `https://res.cloudinary.com/dg0juhz7e/image/upload/f_auto,q_auto,w_800/${name}`;
 
 const FALLBACK: Product[] = [
-    { id:'1', category:'Graphic', name:'CYBERPUNK MECHA TEE', price:85, image:cld('corase/products/cyber-tee'), description:'Jet black oversized tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['S','M','L','XL'], isNewDrop:true, isFeatured:true },
-    { id:'2', category:'Graphic', name:'ACID WASH GOTHIC TEE', price:75, image:cld('corase/products/acid-tee'), description:'Acid wash gothic tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['M','L','XL'], isNewDrop:true, isFeatured:true },
-    { id:'3', category:'Oversized', name:'VOID TEE', price:65, image:cld('corase/products/void-tee'), description:'Minimal void tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['S','M','L','XL'], isNewDrop:false, isFeatured:false },
-    { id:'4', category:'Graphic', name:'NEON OVERLOAD', price:75, image:cld('corase/products/neon-tee'), description:'Neon cyberpunk tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['M','L','XL'], isNewDrop:true, isFeatured:false },
-    { id:'5', category:'Oversized', name:'COLLECTIONS 01', price:60, image:cld('corase/products/archive-tee'), description:'Archive distressed tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['S','M','L'], isNewDrop:true, isFeatured:false },
-    { id:'6', category:'Oversized', name:'LINEAR LOGO', price:55, image:cld('corase/products/neon-tee'), description:'Linear logo tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['S','M','L','XL'], isNewDrop:false, isFeatured:false },
-    { id:'7', category:'Graphic', name:'GHOST MASK', price:80, image:cld('corase/products/void-tee'), description:'Ghost mask tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['L','XL'], isNewDrop:false, isFeatured:false },
-    { id:'8', category:'Graphic', name:'NEO TOKYO STREET TEE', price:70, image:cld('corase/products/archive-tee'), description:'Neo tokyo tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['S','M','L'], isNewDrop:false, isFeatured:false },
-    { id:'9', category:'Acid Wash', name:'VINTAGE WASH 02', price:65, image:cld('corase/products/acid-tee'), description:'Vintage wash tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['M','L','XL'], isNewDrop:false, isFeatured:false },
-    { id:'10', category:'Oversized', name:'ESSENTIAL BLANK', price:45, image:cld('corase/products/cyber-tee'), description:'Essential blank tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['S','M','L','XL'], isNewDrop:false, isFeatured:false },
+    { id:'1', category:'Graphic', name:'CYBERPUNK MECHA TEE', price:1499, image:cld('corase/products/cyber-tee'), description:'Jet black oversized tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['S','M','L','XL'], isNewDrop:true, isFeatured:true },
+    { id:'2', category:'Graphic', name:'ACID WASH GOTHIC TEE', price:1399, image:cld('corase/products/acid-tee'), description:'Acid wash gothic tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['M','L','XL'], isNewDrop:true, isFeatured:true },
+    { id:'3', category:'Oversized', name:'VOID TEE', price:1299, image:cld('corase/products/void-tee'), description:'Minimal void tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['S','M','L','XL'], isNewDrop:false, isFeatured:false },
+    { id:'4', category:'Graphic', name:'NEON OVERLOAD', price:1499, image:cld('corase/products/neon-tee'), description:'Neon cyberpunk tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['M','L','XL'], isNewDrop:true, isFeatured:false },
+    { id:'5', category:'Oversized', name:'COLLECTIONS 01', price:1199, image:cld('corase/products/archive-tee'), description:'Archive distressed tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['S','M','L'], isNewDrop:true, isFeatured:false },
+    { id:'6', category:'Oversized', name:'LINEAR LOGO', price:1099, image:cld('corase/products/neon-tee'), description:'Linear logo tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['S','M','L','XL'], isNewDrop:false, isFeatured:false },
+    { id:'7', category:'Graphic', name:'GHOST MASK', price:1399, image:cld('corase/products/void-tee'), description:'Ghost mask tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['L','XL'], isNewDrop:false, isFeatured:false },
+    { id:'8', category:'Graphic', name:'NEO TOKYO STREET TEE', price:1299, image:cld('corase/products/archive-tee'), description:'Neo tokyo tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['S','M','L'], isNewDrop:false, isFeatured:false },
+    { id:'9', category:'Acid Wash', name:'VINTAGE WASH 02', price:1299, image:cld('corase/products/acid-tee'), description:'Vintage wash tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['M','L','XL'], isNewDrop:false, isFeatured:false },
+    { id:'10', category:'Oversized', name:'ESSENTIAL BLANK', price:999, image:cld('corase/products/cyber-tee'), description:'Essential blank tee.', color:'#ffffff', variants:[{size:'M',stock:10}], sizes:['S','M','L','XL'], isNewDrop:false, isFeatured:false },
 ];
 
 const CollectionsPage = () => {

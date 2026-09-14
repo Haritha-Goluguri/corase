@@ -49,13 +49,24 @@ interface CartContextType {
   checkoutItems: CartItem[];
   checkoutTotal: number;
   checkoutDiscountedTotal: number;
+  isInitialized: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession();
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("corase_cart");
+        if (saved) return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse cart from localStorage", e);
+      }
+    }
+    return [];
+  });
   const [isCartOpen, setIsOpen] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<any | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -87,19 +98,24 @@ export function CartProvider({ children }: { children: ReactNode }) {
             const data = await res.json();
             const dbCart = data.cart || [];
             
-            // Merge local cart into DB cart if they differ
+            // Merge guest cart items into DB cart instead of wiping them
             if (localItems.length > 0) {
-                // Simple merge logic: combine them and remove duplicates (optional)
-                // For now, let's just use DB cart if it exists, else use local
-                if (dbCart.length === 0) {
-                    setCart(localItems);
-                    // Clear local storage after merging
-                    localStorage.removeItem("corase_cart");
+              const mergedCart = [...dbCart];
+              for (const localItem of localItems) {
+                const existing = mergedCart.find(
+                  (item) => item.productId === localItem.productId && item.selectedSize === localItem.selectedSize
+                );
+                if (existing) {
+                  existing.quantity = Math.max(existing.quantity, localItem.quantity);
                 } else {
-                    setCart(dbCart);
+                  mergedCart.push(localItem);
                 }
+              }
+              setCart(mergedCart);
+              localStorage.setItem("corase_cart", JSON.stringify(mergedCart));
             } else {
-                setCart(dbCart);
+              setCart(dbCart);
+              localStorage.setItem("corase_cart", JSON.stringify(dbCart));
             }
           }
         } catch (error) {
@@ -111,7 +127,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           try {
             setCart(JSON.parse(savedCart));
           } catch (e) {
-            console.error("Failed to parse local cart");
+            console.error("Failed to parse local cart", e);
           }
         }
       }
@@ -123,8 +139,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [status]);
 
-  // Sync data when items change (Optimistic with Rollback)
+  // Sync data when items change (Always keep localStorage synced as fast local cache)
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("corase_cart", JSON.stringify(cart));
+      } catch (e) {}
+    }
+
     if (!isInitialized) return;
 
     if (status === "authenticated") {
@@ -141,8 +163,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
           }
         } catch (e) {
           console.error("Cart sync failed, reverting...", e);
-          // Optional: Revert to last known good state or show a toast
-          // For now we just log, but in a production app we might pull the DB state again
           const res = await fetch("/api/cart");
           if (res.ok) {
             const data = await res.json();
@@ -152,10 +172,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       };
 
       // Debounce sync slightly to prevent rapid firing
-      const timeout = setTimeout(syncCart, 500);
+      const timeout = setTimeout(syncCart, 400);
       return () => clearTimeout(timeout);
-    } else if (status === "unauthenticated") {
-      localStorage.setItem("corase_cart", JSON.stringify(cart));
     }
   }, [cart, status, isInitialized]);
 
@@ -168,44 +186,74 @@ export function CartProvider({ children }: { children: ReactNode }) {
         (item) => item.productId === newItem.productId && item.selectedSize === newItem.selectedSize
       );
 
+      let newCart: CartItem[];
       if (existingItemIndex >= 0) {
-        const newCart = [...prevCart];
-        newCart[existingItemIndex].quantity += newItem.quantity;
-        return newCart;
+        newCart = [...prevCart];
+        newCart[existingItemIndex] = {
+          ...newCart[existingItemIndex],
+          quantity: newCart[existingItemIndex].quantity + newItem.quantity,
+        };
+      } else {
+        newCart = [...prevCart, newItem];
       }
-      return [...prevCart, newItem];
+
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("corase_cart", JSON.stringify(newCart));
+        } catch (e) {}
+      }
+      return newCart;
     });
     setIsOpen(true);
   };
 
   const removeFromCart = (productId: string, size: string) => {
-    setCart((prevCart) => prevCart.filter(
-      (item) => !(item.productId === productId && item.selectedSize === size)
-    ));
+    setCart((prevCart) => {
+      const newCart = prevCart.filter(
+        (item) => !(item.productId === productId && item.selectedSize === size)
+      );
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("corase_cart", JSON.stringify(newCart));
+        } catch (e) {}
+      }
+      return newCart;
+    });
   };
 
   const updateQuantity = (productId: string, size: string, quantity: number) => {
     if (quantity < 1) return;
-    setCart((prevCart) =>
-      prevCart.map((item) =>
+    setCart((prevCart) => {
+      const newCart = prevCart.map((item) =>
         item.productId === productId && item.selectedSize === size
           ? { ...item, quantity }
           : item
-      )
-    );
+      );
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("corase_cart", JSON.stringify(newCart));
+        } catch (e) {}
+      }
+      return newCart;
+    });
   };
 
   const clearCart = () => {
     setCart([]);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("corase_cart");
+      } catch (e) {}
+    }
   };
 
   const applyCoupon = async (code: string) => {
-    try {
-      const res = await fetch("/api/coupons/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, amount: totalPrice }),
-      });
+  try {
+    const res = await fetch("/api/coupons/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, amount: checkoutTotalPrice }),
+    });
 
       const data = await res.json();
 
@@ -280,6 +328,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         checkoutItems,
         checkoutTotal: checkoutTotalPrice,
         checkoutDiscountedTotal,
+        isInitialized,
       }}
     >
       {children}
