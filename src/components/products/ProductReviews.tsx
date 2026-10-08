@@ -120,12 +120,28 @@ export default function ProductReviews({ productId, productName }: ProductReview
 
   // Calculations
   const stats = useMemo(() => {
-    if (!reviews.length) return { average: 10, total: 0, photoCount: 0 };
+    if (!reviews.length) {
+      return {
+        average: "0.0",
+        total: 0,
+        photoCount: 0,
+        breakdown: { exceptional: 0, great: 0, standard: 0 },
+      };
+    }
     const total = reviews.length;
-    const sum = reviews.reduce((acc, r) => acc + (Number(r.rating) || 10), 0);
+    const sum = reviews.reduce((acc, r) => acc + (Number(r.rating) || 0), 0);
     const average = (sum / total).toFixed(1);
     const photoCount = reviews.filter((r) => !!r.image).length;
-    return { average, total, photoCount };
+    const exceptional = Math.round(
+      (reviews.filter((r) => Number(r.rating) >= 9).length / total) * 100
+    );
+    const great = Math.round(
+      (reviews.filter((r) => Number(r.rating) >= 7 && Number(r.rating) < 9).length / total) * 100
+    );
+    const standard = Math.round(
+      (reviews.filter((r) => Number(r.rating) < 7).length / total) * 100
+    );
+    return { average, total, photoCount, breakdown: { exceptional, great, standard } };
   }, [reviews]);
 
   // Filtered reviews
@@ -217,7 +233,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
             </span>
           </div>
           <h2 className="text-3xl md:text-4xl font-black font-syncopate tracking-tight text-white uppercase">
-            Customer Reviews
+            Customer Reviews {stats.total > 0 && `(${stats.total})`}
           </h2>
         </div>
 
@@ -253,109 +269,120 @@ export default function ProductReviews({ productId, productName }: ProductReview
         </div>
       </div>
 
-      {/* Score Overview Card */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
-        {/* Rating Score */}
-        <div className="bg-[#121212] border border-white/[0.08] rounded-2xl p-8 flex flex-col justify-center">
-          <div className="flex items-baseline gap-3 mb-2">
-            <span className="text-6xl font-black font-syncopate text-white tracking-tighter">
-              {stats.average}
-            </span>
-            <span className="text-2xl font-bold font-syncopate text-white/40">/ 10</span>
+      {/* Score Overview Card (Only shown if genuine reviews exist) */}
+      {stats.total > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
+          {/* Rating Score */}
+          <div className="bg-[#121212] border border-white/[0.08] rounded-2xl p-8 flex flex-col justify-center">
+            <div className="flex items-baseline gap-3 mb-2">
+              <span className="text-6xl font-black font-syncopate text-white tracking-tighter">
+                {stats.average}
+              </span>
+              <span className="text-2xl font-bold font-syncopate text-white/40">/ 10</span>
+            </div>
+            <div className="flex items-center gap-1.5 mb-3 text-brand-red">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <Star
+                  key={i}
+                  size={16}
+                  fill={i < Math.round(Number(stats.average)) ? "currentColor" : "none"}
+                  className={i < Math.round(Number(stats.average)) ? "text-brand-red" : "text-white/10"}
+                />
+              ))}
+            </div>
+            <p className="text-xs text-white/40 font-medium tracking-wide">
+              Based on {stats.total} verified customer {stats.total === 1 ? "rating" : "ratings"}
+            </p>
           </div>
-          <div className="flex items-center gap-1.5 mb-3 text-brand-red">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <Star
-                key={i}
-                size={16}
-                fill={i < Math.round(Number(stats.average)) ? "currentColor" : "none"}
-                className={i < Math.round(Number(stats.average)) ? "text-brand-red" : "text-white/10"}
+
+          {/* Dynamic Rating Breakdown */}
+          <div className="bg-[#121212] border border-white/[0.08] rounded-2xl p-8 flex flex-col justify-center gap-3">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-white/70 font-bold uppercase tracking-wider">Exceptional (9–10★)</span>
+              <span className="text-white font-mono font-bold">{stats.breakdown.exceptional}%</span>
+            </div>
+            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-brand-red rounded-full transition-all duration-500"
+                style={{ width: `${stats.breakdown.exceptional}%` }}
               />
-            ))}
-          </div>
-          <p className="text-xs text-white/40 font-medium tracking-wide">
-            Based on {stats.total} verified customer ratings
-          </p>
-        </div>
-
-        {/* Breakdown / Highlights */}
-        <div className="bg-[#121212] border border-white/[0.08] rounded-2xl p-8 flex flex-col justify-center gap-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-white/70 font-bold uppercase tracking-wider">Fabric Weight & Feel</span>
-            <span className="text-white font-mono font-bold">10 / 10</span>
-          </div>
-          <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-            <div className="w-full h-full bg-brand-red rounded-full" />
-          </div>
-
-          <div className="flex items-center justify-between text-xs pt-2">
-            <span className="text-white/70 font-bold uppercase tracking-wider">Boxy Fit Proportion</span>
-            <span className="text-white font-mono font-bold">9.8 / 10</span>
-          </div>
-          <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-            <div className="w-[98%] h-full bg-white rounded-full" />
-          </div>
-
-          <div className="flex items-center justify-between text-xs pt-2">
-            <span className="text-white/70 font-bold uppercase tracking-wider">Print Durability</span>
-            <span className="text-white font-mono font-bold">9.6 / 10</span>
-          </div>
-          <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-            <div className="w-[96%] h-full bg-white/80 rounded-full" />
-          </div>
-        </div>
-
-        {/* Customer Photos Strip */}
-        <div className="bg-[#121212] border border-white/[0.08] rounded-2xl p-8 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-bold uppercase tracking-wider text-white">
-                Customer Photos
-              </span>
-              <span className="text-[10px] font-mono text-white/40 px-2 py-0.5 rounded bg-white/5 border border-white/10">
-                {stats.photoCount} Photos
-              </span>
             </div>
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
-              {reviews
-                .filter((r) => !!r.image)
-                .slice(0, 4)
-                .map((r, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setActivePhotoModal(r.image!)}
-                    className="relative w-16 h-16 rounded-xl overflow-hidden border border-white/10 flex-shrink-0 group hover:border-white transition-all cursor-pointer"
-                  >
-                    <Image
-                      src={r.image!}
-                      alt="Review photo"
-                      fill
-                      className="object-cover group-hover:scale-110 transition-transform duration-300"
-                    />
-                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Maximize2 size={12} className="text-white" />
-                    </div>
-                  </button>
-                ))}
-              {stats.photoCount === 0 && (
-                <div className="text-xs text-white/30 italic py-3">No customer photos yet. Be the first!</div>
-              )}
+
+            <div className="flex items-center justify-between text-xs pt-2">
+              <span className="text-white/70 font-bold uppercase tracking-wider">Recommended (7–8★)</span>
+              <span className="text-white font-mono font-bold">{stats.breakdown.great}%</span>
+            </div>
+            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-white rounded-full transition-all duration-500"
+                style={{ width: `${stats.breakdown.great}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-xs pt-2">
+              <span className="text-white/70 font-bold uppercase tracking-wider">Standard (&lt;7★)</span>
+              <span className="text-white font-mono font-bold">{stats.breakdown.standard}%</span>
+            </div>
+            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-white/60 rounded-full transition-all duration-500"
+                style={{ width: `${stats.breakdown.standard}%` }}
+              />
             </div>
           </div>
 
-          {stats.photoCount > 0 && (
-            <button
-              onClick={() => setFilterWithPhotos(!filterWithPhotos)}
-              className={`text-xs font-bold uppercase tracking-wider mt-4 flex items-center gap-2 transition-colors ${
-                filterWithPhotos ? "text-brand-red" : "text-white/60 hover:text-white"
-              }`}
-            >
-              <Camera size={14} />
-              {filterWithPhotos ? "Showing photo reviews only (Show All)" : "Filter by photo reviews"}
-            </button>
-          )}
+          {/* Customer Photos Strip */}
+          <div className="bg-[#121212] border border-white/[0.08] rounded-2xl p-8 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs font-bold uppercase tracking-wider text-white">
+                  Customer Photos
+                </span>
+                <span className="text-[10px] font-mono text-white/40 px-2 py-0.5 rounded bg-white/5 border border-white/10">
+                  {stats.photoCount} Photos
+                </span>
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
+                {reviews
+                  .filter((r) => !!r.image)
+                  .slice(0, 4)
+                  .map((r, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setActivePhotoModal(r.image!)}
+                      className="relative w-16 h-16 rounded-xl overflow-hidden border border-white/10 flex-shrink-0 group hover:border-white transition-all cursor-pointer"
+                    >
+                      <Image
+                        src={r.image!}
+                        alt="Review photo"
+                        fill
+                        className="object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Maximize2 size={12} className="text-white" />
+                      </div>
+                    </button>
+                  ))}
+                {stats.photoCount === 0 && (
+                  <div className="text-xs text-white/30 italic py-3">No customer photos yet.</div>
+                )}
+              </div>
+            </div>
+
+            {stats.photoCount > 0 && (
+              <button
+                onClick={() => setFilterWithPhotos(!filterWithPhotos)}
+                className={`text-xs font-bold uppercase tracking-wider mt-4 flex items-center gap-2 transition-colors ${
+                  filterWithPhotos ? "text-brand-red" : "text-white/60 hover:text-white"
+                }`}
+              >
+                <Camera size={14} />
+                {filterWithPhotos ? "Showing photo reviews only (Show All)" : "Filter by photo reviews"}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Informational banner for visitors & non-purchasers */}
       {!session && (
@@ -592,12 +619,21 @@ export default function ProductReviews({ productId, productName }: ProductReview
         <div className="text-center py-20 bg-[#121212] border border-white/[0.06] rounded-3xl p-8">
           <MessageSquare size={32} className="text-white/20 mx-auto mb-4" />
           <h4 className="text-base font-black font-syncopate uppercase text-white mb-1">
-            No Reviews Yet
+            {filterWithPhotos ? "No Photo Reviews" : "No Reviews Yet"}
           </h4>
           <p className="text-xs text-white/40 mb-6">
-            Be the first to rate and review this piece.
+            {filterWithPhotos
+              ? "None of the verified reviews include customer photos yet."
+              : "Be the first to rate and review this piece."}
           </p>
-          {!session ? (
+          {filterWithPhotos ? (
+            <button
+              onClick={() => setFilterWithPhotos(false)}
+              className="bg-white text-black px-6 py-3 rounded-xl font-black font-syncopate text-xs tracking-widest uppercase hover:bg-white/90"
+            >
+              Show All Reviews
+            </button>
+          ) : !session ? (
             <button
               onClick={() => router.push('/login')}
               className="bg-white text-black px-6 py-3 rounded-xl font-black font-syncopate text-xs tracking-widest uppercase hover:bg-white/90"

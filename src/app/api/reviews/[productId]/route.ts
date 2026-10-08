@@ -7,40 +7,6 @@ import { Order } from "@/models/Order";
 import Product from "@/models/Product";
 import mongoose from "mongoose";
 
-// Curated seed reviews for streetwear products with 1-10 ratings & images
-const SAMPLE_REVIEWS = [
-  {
-    _id: "sample-1",
-    userName: "Arjun V.",
-    userImage: "",
-    rating: 10,
-    comment: "Fabric weight is incredible. True 280 GSM heavy cotton that holds its boxy structure. The wash and distressing look even more premium in person than the product photos.",
-    image: "/products/cyber-tee.png",
-    isVerifiedPurchase: true,
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: "sample-2",
-    userName: "Rohan M.",
-    userImage: "",
-    rating: 9,
-    comment: "Brutal silhouette. The neck collar is thick and ribbing is firm so it won't bacon after washes. Dropped shoulders sit exactly right. Highly recommend sizing true for oversize fit.",
-    image: "/products/acid-tee.png",
-    isVerifiedPurchase: true,
-    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: "sample-3",
-    userName: "Devansh S.",
-    userImage: "",
-    rating: 10,
-    comment: "Solid 10/10 piece. The screenprint has zero plastic feel and breathes well. Wore it to an underground drop event and got asked about it multiple times. Essential drip.",
-    image: "/products/archive-tee.png",
-    isVerifiedPurchase: true,
-    createdAt: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
 // GET all reviews for a product
 export async function GET(
   req: Request,
@@ -55,22 +21,10 @@ export async function GET(
       .sort({ createdAt: -1 })
       .lean();
 
-    // If database has reviews, return them; otherwise return curated samples so every product has reviews
-    if (dbReviews && dbReviews.length > 0) {
-      return NextResponse.json(dbReviews);
-    }
-
-    // Return sample reviews linked to this productId
-    const mappedSamples = SAMPLE_REVIEWS.map((r, index) => ({
-      ...r,
-      _id: `seed-${productId}-${index}`,
-      productId,
-    }));
-
-    return NextResponse.json(mappedSamples);
+    return NextResponse.json(dbReviews || []);
   } catch (error) {
     console.error("Failed to fetch reviews:", error);
-    return NextResponse.json(SAMPLE_REVIEWS);
+    return NextResponse.json([]);
   }
 }
 
